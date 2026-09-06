@@ -9,7 +9,7 @@
  */
 
 import { effect, escape, number, percent } from "../ui.js";
-import { arc, contrastEmphasis, drawNodes, nodeRadii, scaleBetween } from "./draw.js";
+import { arc, contrastEmphasis, drawNodes, hit, nodeRadii, scaleBetween } from "./draw.js";
 
 function edgeGeometry(context) {
   const { model, points, state } = context;
@@ -173,7 +173,7 @@ export const network = {
         const strandPaths = strands
           .map(
             (s) =>
-              `<path class="strand" d="${s.path}" stroke-width="${
+              `<path class="strand" data-study="${escape(s.row.studlab)}" d="${s.path}" stroke-width="${
                 state.separation > 0.02 ? s.width.toFixed(2) : width.toFixed(2)
               }" opacity="${
                 state.separation > 0.02 ? 0.85 : 1 / Math.max(1, strands.length) + 0.15
@@ -186,7 +186,7 @@ export const network = {
           .join("");
         return `<g class="edge${highlighted ? " highlighted" : ""}" data-edge="${escape(
           key
-        )}">${strandPaths}</g>`;
+        )}">${hit(arc(a, b))}${strandPaths}</g>`;
       })
       .join("");
 

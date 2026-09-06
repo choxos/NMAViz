@@ -21,7 +21,7 @@
 
 import { diffusionMass, diffusionPartials, varianceFrom } from "../../nma/diffusion.js";
 import { effect, escape, number, onScale, percent } from "../ui.js";
-import { arc, contrastEmphasis, drawNodes, nodeRadii, scaleBetween } from "./draw.js";
+import { arc, contrastEmphasis, drawNodes, hit, nodeRadii, scaleBetween } from "./draw.js";
 
 const STEPS = 22;
 
@@ -151,7 +151,9 @@ export const diffusionLens = {
       .map((edge) => {
         const a = points[model.index.get(edge.treat1)];
         const b = points[model.index.get(edge.treat2)];
-        return `<path class="diffusion-edge" d="${arc(a, b)}"/>`;
+        return `<g class="diffusion-edge" data-edge="${escape(
+          `${edge.treat1} ${edge.treat2}`
+        )}">${hit(arc(a, b))}<path d="${arc(a, b)}"/></g>`;
       })
       .join("");
 

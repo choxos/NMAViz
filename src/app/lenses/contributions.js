@@ -22,7 +22,7 @@ import {
 } from "../../nma/contributions.js";
 import { evidenceFlow } from "../../nma/flow.js";
 import { escape, percent } from "../ui.js";
-import { arc, contrastEmphasis, drawNodes, scaleBetween } from "./draw.js";
+import { arc, contrastEmphasis, drawNodes, hit, scaleBetween } from "./draw.js";
 
 function studyShares(model, contributions) {
   const shares = [];
@@ -131,6 +131,34 @@ export const contributions = {
     "Davies AL, Papakonstantinou T, Nikolakopoulou A, Ruecker G, Galla T. Network meta-analysis and random walks. Stat Med. 2022;41(12):2091-2114.",
   mark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg>',
 
+  /* The point of this lens is that the two published methods can disagree
+   * about the same comparison, so a hover shows both at once. */
+  describe(context, target) {
+    if (target.kind !== "edge" || !context.state.contrast) return null;
+    const { model, state } = context;
+    const network = evidenceFlow(model, state.contrast.treat1, state.contrast.treat2);
+    if (!network) return null;
+    const shortest = shortestPathContributions(network);
+    const walk = randomWalkContributions(network, model.treatments.length);
+    const [treat1, treat2] = target.id.split(" ");
+    const key = shortest.has(`${treat1} ${treat2}`) ? `${treat1} ${treat2}` : `${treat2} ${treat1}`;
+    if (!shortest.has(key)) return null;
+    const a = shortest.get(key) ?? 0;
+    const b = walk.get(key) ?? 0;
+    return {
+      kicker: "Contribution",
+      title: `${treat1} vs ${treat2}`,
+      rows: [
+        ["Shortest path", percent(a, 1)],
+        ["Random walk", percent(b, 1)],
+      ],
+      note:
+        Math.abs(a - b) > 0.02
+          ? "The two methods disagree here, which happens where several routes of equal length are available."
+          : "Share of the estimate this comparison is responsible for.",
+    };
+  },
+
   draw(context) {
     const { model, points, state } = context;
     if (!state.contrast) return { stage: "", inspector: "", note: "" };
@@ -150,6 +178,7 @@ export const contributions = {
         return `
           <g class="contribution-edge${carrying ? "" : " idle"}" data-edge="${escape(key)}">
             <title>${escape(edge.treat1)} vs ${escape(edge.treat2)}: ${percent(share, 1)}</title>
+            ${hit(arc(a, b))}
             <path d="${arc(a, b)}" stroke-width="${
               carrying ? scaleBetween(share, 0, largest, 1.8, 13).toFixed(2) : "1"
             }"/>

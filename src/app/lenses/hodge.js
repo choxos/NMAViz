@@ -15,7 +15,7 @@
 
 import { hodge } from "../../nma/hodge.js";
 import { effect, escape, number, percent } from "../ui.js";
-import { arc, drawNodes, scaleBetween } from "./draw.js";
+import { arc, drawNodes, hit, scaleBetween } from "./draw.js";
 
 const COMPONENTS = {
   residual: { label: "All", pick: (h, i) => h.residual[i] },
@@ -138,6 +138,32 @@ export const hodgeLens = {
     "Jiang X, Lim LH, Yao Y, Ye Y. Statistical ranking and combinatorial Hodge theory. Math Program. 2011;127(1):203-244.",
   mark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 4 21 19H3z"/><path d="M12 10v4M12 16.6v.4"/></svg>',
 
+  /* The whole claim of this lens is that one number splits into three that
+   * add back up, so a hover on a comparison shows the split for that one. */
+  describe(context, target) {
+    if (target.kind !== "edge") return null;
+    const h = hodge(context.model);
+    const [treat1, treat2] = target.id.split(" ");
+    const i = h.edges.findIndex(
+      (e) =>
+        (e.treat1 === treat1 && e.treat2 === treat2) ||
+        (e.treat1 === treat2 && e.treat2 === treat1)
+    );
+    if (i === -1) return null;
+    const flip = h.edges[i].treat1 === treat1 ? 1 : -1;
+    return {
+      kicker: "Inconsistency",
+      title: `${treat1} vs ${treat2}`,
+      rows: [
+        ["Observed direct", number(flip * h.observed[i], 3)],
+        ["Consistency fit", number(flip * h.gradient[i], 3)],
+        ["Around triangles", number(flip * h.curl[i], 3)],
+        ["Long loops", number(flip * h.harmonic[i], 3)],
+      ],
+      note: "The last three add to the first. The two below it are what no consistency model can explain.",
+    };
+  },
+
   draw(context) {
     const { model, points, state } = context;
     const h = hodge(model);
@@ -183,6 +209,7 @@ export const hodgeLens = {
               value,
               3
             )} ${value >= 0 ? "above" : "below"} the consistency model</title>
+            ${hit(arc(a, b))}
             <path d="${arc(a, b)}" stroke-width="${scaleBetween(strength, 0, 1, 1.2, 10).toFixed(
               2
             )}" opacity="${(0.25 + 0.7 * strength).toFixed(3)}"/>

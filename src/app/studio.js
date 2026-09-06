@@ -9,6 +9,7 @@
  */
 
 import { LAYOUTS, frame, relieveOverlap, stressOf } from "./layout.js";
+import { describe, tipMarkup } from "./tips.js";
 import { LENSES } from "./lenses/index.js";
 import { nodeRadii } from "./lenses/draw.js";
 import { activeModel, load, state, subscribe, update } from "./state.js";
@@ -74,6 +75,7 @@ function shell() {
       <aside class="panel inspector" id="inspector"></aside>
       <div class="panel readouts" id="readouts"></div>
       <div class="overlay" id="overlay" hidden></div>
+      <div class="tip" id="tip" role="tooltip" hidden></div>
     </div>
   `;
 }
@@ -482,6 +484,7 @@ function layoutFor(model) {
  * be expressed in the same coordinates the drawing uses. */
 let lastBox = null;
 let lastPoints = null;
+let lastContext = null;
 
 function currentFraction(index) {
   if (!lastBox || !lastPoints?.[index]) return { u: 0.5, v: 0.5 };
@@ -560,6 +563,7 @@ function renderStage() {
     dataset: state.dataset,
   };
 
+  lastContext = context;
   setAnimation(Boolean(lens.animate));
   const drawn = lens.draw(context);
   stage.innerHTML = drawn.stage;
@@ -630,6 +634,64 @@ async function loadFile(file) {
   } catch (error) {
     update({ error: error.message, panel: "data" });
   }
+}
+
+/* ---- The hover card --------------------------------------------------------
+ *
+ * One card, moved and refilled rather than created and destroyed, so a pointer
+ * travelling across a dense network does not build and throw away a hundred
+ * elements. It is placed beside the pointer and never under it, and it flips to
+ * the other side rather than running off the window.
+ */
+
+let tipTarget = null;
+
+function hideTip() {
+  const tip = document.querySelector("#tip");
+  if (!tip || tip.hidden) return;
+  tip.hidden = true;
+  tipTarget = null;
+}
+
+function targetOf(element) {
+  const treatment = element.closest("[data-treatment]");
+  if (treatment) return { kind: "treatment", id: treatment.dataset.treatment };
+  const study = element.closest("[data-study]");
+  if (study) return { kind: "study", id: study.dataset.study };
+  const edge = element.closest("[data-edge]");
+  if (edge) return { kind: "edge", id: edge.dataset.edge };
+  return null;
+}
+
+function placeTip(event) {
+  const tip = document.querySelector("#tip");
+  const gap = 16;
+  const { offsetWidth: width, offsetHeight: height } = tip;
+  // Below and to the right of the pointer, unless that would leave the window.
+  let x = event.clientX + gap;
+  let y = event.clientY + gap;
+  if (x + width > window.innerWidth - 8) x = event.clientX - gap - width;
+  if (y + height > window.innerHeight - 8) y = event.clientY - gap - height;
+  tip.style.transform = `translate(${Math.max(8, x)}px, ${Math.max(8, y)}px)`;
+}
+
+function showTip(event) {
+  if (dragging) return hideTip();
+  const model = activeModel();
+  const target = event.target instanceof Element ? targetOf(event.target) : null;
+  if (!target || !model) return hideTip();
+
+  const tip = document.querySelector("#tip");
+  const key = `${target.kind}\u0000${target.id}`;
+  if (key !== tipTarget) {
+    const lens = LENSES.find((l) => l.id === state.lens);
+    const card = describe(lastContext ?? { model, state, measure: state.dataset?.measure ?? "MD" }, target, lens);
+    if (!card) return hideTip();
+    tip.innerHTML = tipMarkup(card);
+    tipTarget = key;
+    tip.hidden = false;
+  }
+  placeTip(event);
 }
 
 /* ---- Dragging a treatment -------------------------------------------------
@@ -831,6 +893,11 @@ function wire() {
   });
 
   const stage = document.querySelector("#stage");
+  stage.addEventListener("pointermove", showTip);
+  stage.addEventListener("pointerleave", hideTip);
+  // A card that outlived what it described would be worse than none.
+  stage.addEventListener("pointerdown", hideTip);
+  addEventListener("blur", hideTip);
   stage.addEventListener("pointerdown", startDrag);
   stage.addEventListener("pointermove", moveDrag);
   stage.addEventListener("pointerup", endDrag);

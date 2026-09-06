@@ -10,7 +10,7 @@
 
 import { evidenceFlow, flowPaths } from "../../nma/flow.js";
 import { effect, escape, number, percent } from "../ui.js";
-import { DEFS, arc, contrastEmphasis, drawNodes, nodeRadii, scaleBetween } from "./draw.js";
+import { DEFS, arc, contrastEmphasis, drawNodes, hit, nodeRadii, scaleBetween } from "./draw.js";
 
 function inspector(context, flow, paths) {
   const { model, measure, dataset } = context;
@@ -97,6 +97,31 @@ export const flow = {
     "Koenig J, Krahn U, Binder H. Visualizing the flow of evidence in network meta-analysis and characterizing mixed treatment comparisons. Stat Med. 2013;32(30):5414-5429.",
   mark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h13M12 7l5 5-5 5M18.5 12H21"/></svg>',
 
+  /* An arrow in this lens is a current, which the shared describer knows
+   * nothing about, so the flow through it is added on top. */
+  describe(context, target) {
+    if (target.kind !== "edge" || !context.state.contrast) return null;
+    const { model, state } = context;
+    const network = evidenceFlow(model, state.contrast.treat1, state.contrast.treat2);
+    const [treat1, treat2] = target.id.split(" ");
+    const edge = network?.edges.find(
+      (e) => e.comparison.treat1 === treat1 && e.comparison.treat2 === treat2
+    );
+    if (!edge) return null;
+    return {
+      kicker: "Evidence flow",
+      title: `${edge.from} → ${edge.to}`,
+      rows: [
+        ["Current along it", percent(edge.flow, 1)],
+        ["Of the estimate for", `${state.contrast.treat1} vs ${state.contrast.treat2}`],
+      ],
+      note:
+        edge.flow > 1e-6
+          ? "Evidence travels this way. Width is how much."
+          : "No evidence for this comparison travels along here.",
+    };
+  },
+
   draw(context) {
     const { model, points, state } = context;
     if (!state.contrast) return { stage: "", inspector: "", note: "" };
@@ -129,6 +154,7 @@ export const flow = {
           <g class="flow-edge${carrying ? "" : " idle"}${edge.isTarget ? " target" : ""}"
              data-edge="${escape(`${edge.comparison.treat1} ${edge.comparison.treat2}`)}">
             <title>${escape(edge.from)} to ${escape(edge.to)}: ${percent(edge.flow, 1)} of the estimate</title>
+            ${hit(path)}
             <path class="flow-band" d="${path}" stroke-width="${width.toFixed(2)}"
               ${carrying ? 'marker-end="url(#flow-arrow)"' : ""}/>
             ${

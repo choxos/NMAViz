@@ -127,7 +127,9 @@ export function drawNodes(context, { emphasis = new Map(), radii } = {}) {
         <g class="node ${role}${selected ? " selected" : ""}${pinned}" data-treatment="${escape(
           name
         )}">
-          <title>${escape(name)}</title>
+          <circle class="hit-node" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(
+            1
+          )}" r="${(sizes[i] + 9).toFixed(1)}"/>
           <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="${sizes[i].toFixed(1)}"/>
           ${labels.get(i) ?? ""}
         </g>`;
@@ -145,6 +147,15 @@ export function contrastEmphasis(state) {
   }
   return emphasis;
 }
+
+/* An invisible band along an edge, wide enough to be aimed at.
+ *
+ * A comparison carrying little evidence is drawn as a hairline, and a hairline
+ * is not a target: the reader would have to place the pointer within a pixel of
+ * it to read what it says. Every edge therefore carries a transparent stroke of
+ * a usable width underneath, which is what the pointer actually hits.
+ */
+export const hit = (d) => `<path class="hit" d="${d}"/>`;
 
 /* A gentle arc between two points. Straight lines through a dense middle are
  * hard to follow; a shallow curve separates the two directions of a pair and
