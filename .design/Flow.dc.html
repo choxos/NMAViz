@@ -1,0 +1,171 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;550;600;620;650;750&display=swap">
+  <style>
+    body { margin: 0; font-family: Inter, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #2f5a8c; } a:hover { color: #23345e; }
+    .panel { background: #fffffff2; border: 1px solid #1724361f; border-radius: 15px; box-shadow: 0 1px 2px #2433440a, 0 2px 6px #24334408, 0 18px 48px #2433440d; }
+    .kicker { font-size: 9.5px; font-weight: 650; letter-spacing: 0.12em; text-transform: uppercase; color: #8b949d; }
+    .lens { border: 0; background: none; color: #67727c; border-radius: 11px; padding: 8px 10px; font: 550 12px Inter, sans-serif; display: flex; align-items: center; gap: 6px; }
+    .lens.on { background: #23345e; color: #f4f6fb; }
+    .node-label { font-size: 11px; font-weight: 550; fill: #3b4652; }
+    .band { fill: none; stroke: #b4653a; stroke-linecap: round; opacity: 0.34; }
+    /* The current: a dashed band sliding along the still one at a constant
+       speed, so width, and only width, means how much evidence travels. */
+    .current { fill: none; stroke: #b4653a; stroke-linecap: round; opacity: 0.95;
+      stroke-dasharray: 7 21; animation: current 1.4s linear infinite; }
+    @keyframes current { to { stroke-dashoffset: -28; } }
+    @media (prefers-reduced-motion: reduce) { .current { animation: none; } }
+    .idle { fill: none; stroke: #7a8794; opacity: 0.22; stroke-width: 1; }
+    .rt td { padding: 6px 0; border-bottom: 1px solid #17243612; color: #3b4652; font-size: 11px; }
+    .rt td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+    .row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 13px; background: #fff; }
+    .row dt { font-size: 11px; font-weight: 600; color: #67727c; }
+    .row dd { margin: 0; font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+  </style>
+</helmet>
+
+<div style="position: relative; width: 1280px; height: 720px; background: #f2f1ee; color: #191d24; overflow: hidden">
+
+  <svg viewBox="0 0 1280 720" style="position: absolute; inset: 0; width: 1280px; height: 720px">
+    <defs>
+      <marker id="tip" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse">
+        <path d="M0 0.6 L10 5 L0 9.4 z" fill="#b4653a"/>
+      </marker>
+    </defs>
+
+    <path class="idle" d="M624 394 L843 371"/>
+    <path class="idle" d="M624 394 L679 150"/>
+    <path class="idle" d="M624 394 L426 580"/>
+    <path class="idle" d="M624 394 L721 601"/>
+
+    <g>
+      <path class="band" d="M395 322 L497 279" stroke-width="9.4"/>
+      <path class="current" d="M395 322 L497 279" stroke-width="5.2" marker-end="url(#tip)"/>
+      <path class="band" d="M395 322 L612 386" stroke-width="10.8"/>
+      <path class="current" d="M395 322 L612 386" stroke-width="5.9" marker-end="url(#tip)"/>
+      <path class="band" d="M510 268 L612 385" stroke-width="8.2"/>
+      <path class="current" d="M510 268 L612 385" stroke-width="4.5" marker-end="url(#tip)"/>
+      <path class="band" d="M510 268 L618 341" stroke-width="4.4"/>
+      <path class="current" d="M510 268 L618 341" stroke-width="2.4" marker-end="url(#tip)"/>
+      <path class="band" d="M624 394 L562 390" stroke-width="11" style="stroke: #23345e"/>
+      <path class="current" d="M624 394 L562 390" stroke-width="6" style="stroke: #23345e" marker-end="url(#tip)"/>
+      <path class="band" d="M625 348 L558 385" stroke-width="6.4"/>
+      <path class="current" d="M625 348 L558 385" stroke-width="3.5" marker-end="url(#tip)"/>
+      <path class="band" d="M575 468 L552 402" stroke-width="5.2"/>
+      <path class="current" d="M575 468 L552 402" stroke-width="2.9" marker-end="url(#tip)"/>
+      <path class="band" d="M624 394 L582 460" stroke-width="4.6"/>
+      <path class="current" d="M624 394 L582 460" stroke-width="2.5" marker-end="url(#tip)"/>
+      <path class="band" d="M624 394 L632 361" stroke-width="4.0"/>
+      <path class="current" d="M624 394 L632 361" stroke-width="2.2" marker-end="url(#tip)"/>
+    </g>
+
+    <g>
+      <circle cx="395" cy="322" r="12" fill="#23345e" stroke="#23345e" stroke-width="1.8"/>
+      <text class="node-label" x="378" y="315" text-anchor="end" style="fill: #191d24; font-weight: 650">acar</text>
+      <circle cx="545" cy="388" r="12" fill="#23345e" stroke="#23345e" stroke-width="1.8"/>
+      <text class="node-label" x="528" y="404" text-anchor="end" style="fill: #191d24; font-weight: 650">metf</text>
+      <circle cx="624" cy="394" r="22" fill="#fff" stroke="#23345e" stroke-width="1.8"/>
+      <text class="node-label" x="624" y="428" text-anchor="middle">plac</text>
+      <circle cx="625" cy="348" r="16" fill="#fff" stroke="#23345e" stroke-width="1.8"/>
+      <text class="node-label" x="608" y="332" text-anchor="end">rosi</text>
+      <circle cx="510" cy="268" r="11" fill="#fff" stroke="#23345e" stroke-width="1.8"/>
+      <text class="node-label" x="497" y="252" text-anchor="end">sulf</text>
+      <circle cx="575" cy="468" r="11" fill="#fff" stroke="#23345e" stroke-width="1.8"/>
+      <text class="node-label" x="575" y="494" text-anchor="middle">piog</text>
+      <circle cx="843" cy="371" r="9" fill="#fff" stroke="#23345e" stroke-width="1.8"/>
+      <text class="node-label" x="858" y="375">sita</text>
+      <circle cx="679" cy="150" r="9" fill="#fff" stroke="#23345e" stroke-width="1.8"/>
+      <text class="node-label" x="679" y="130" text-anchor="middle">vild</text>
+      <circle cx="426" cy="580" r="10" fill="#fff" stroke="#23345e" stroke-width="1.8"/>
+      <text class="node-label" x="426" y="606" text-anchor="middle">migl</text>
+      <circle cx="721" cy="601" r="9" fill="#fff" stroke="#23345e" stroke-width="1.8"/>
+      <text class="node-label" x="721" y="626" text-anchor="middle">benf</text>
+    </g>
+  </svg>
+
+  <div style="position: absolute; left: 26px; top: 22px; max-width: 320px">
+    <div style="display: flex; align-items: center; gap: 9px">
+      <span style="display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: #fff; border: 1px solid #1724361f; color: #23345e">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="4.5" r="2.2"/><circle cx="4.8" cy="16" r="2.2"/><circle cx="19.2" cy="16" r="2.2"/><path d="M10.6 6.4 6.2 14.1M13.4 6.4l4.4 7.7M7 16h10"/></svg>
+      </span>
+      <span style="font-size: 19px; font-weight: 650; letter-spacing: -0.5px; color: #23345e">NMA<span style="font-weight: 450; color: #3b4652">Viz</span></span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 7px; margin-top: 9px; font-size: 10px; font-weight: 600; letter-spacing: 0.13em; text-transform: uppercase; color: #8b949d">
+      <span style="width: 5px; height: 5px; border-radius: 50%; background: #b4653a; box-shadow: 0 0 10px #b4653a44"></span>Diabetes: glucose lowering agents
+    </div>
+    <h1 style="margin: 12px 0 0; font-size: 29px; font-weight: 620; letter-spacing: -0.9px; line-height: 1.1">Flow</h1>
+    <p style="margin: 6px 0 0; max-width: 34ch; font-size: 11.5px; line-height: 1.6; color: #67727c">One unit of evidence enters at acar and leaves at metf. Arrow width is the share of the estimate travelling that way.</p>
+  </div>
+
+  <nav class="panel" style="position: absolute; left: 50%; top: 22px; transform: translateX(-50%); display: flex; gap: 2px; padding: 4px">
+    <button class="lens"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="17" r="2"/><circle cx="19" cy="17" r="2"/><path d="M10.7 6.7 6.3 15.3M13.3 6.7l4.4 8.6M7 17h10"/></svg>Network</button>
+    <button class="lens"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><rect x="16" y="4" width="4" height="4" rx="1"/><rect x="16" y="16" width="4" height="4" rx="1"/><path d="M7 6.6 16 7M7 17.4 16 17M7 7.4l9 9.2"/></svg>Trials</button>
+    <button class="lens on"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h13M12 7l5 5-5 5M18.5 12H21"/></svg>Flow</button>
+    <button class="lens"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg>Contributions</button>
+    <button class="lens"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 19h4v-5H3zM10 19h4V8h-4zM17 19h4v-9h-4z"/></svg>Reconstruction</button>
+    <button class="lens"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 4 21 19H3z"/><path d="M12 10v4M12 16.6v.4"/></svg>Inconsistency</button>
+  </nav>
+
+  <div style="position: absolute; right: 26px; top: 22px; display: flex; gap: 8px">
+    <div class="panel" style="display: flex; align-items: center; gap: 7px; padding: 9px 13px; font: 550 12px Inter, sans-serif; color: #3b4652">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="7.5" ry="3"/><path d="M4.5 5.5v13c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-13M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/></svg>Data
+    </div>
+    <div class="panel" style="width: 38px; height: 38px; display: grid; place-items: center; color: #3b4652"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6v.6"/></svg></div>
+    <div class="panel" style="width: 38px; height: 38px; display: grid; place-items: center; color: #3b4652"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg></div>
+  </div>
+
+  <aside class="panel" style="position: absolute; left: 26px; bottom: 26px; width: 292px; padding: 17px; display: flex; flex-direction: column; gap: 15px">
+    <div>
+      <div class="kicker" style="margin-bottom: 7px">Comparison of interest</div>
+      <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px">
+        <div style="border: 1px solid #1724361f; border-radius: 9px; background: #fff; padding: 8px 9px; font-size: 11.5px">acar</div>
+        <div style="width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #1724361f; border-radius: 9px; background: #fff; color: #3b4652"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 4 7l3 3M4 7h11a4 4 0 0 1 4 4M17 20l3-3-3-3M20 17H9a4 4 0 0 1-4-4"/></svg></div>
+        <div style="border: 1px solid #1724361f; border-radius: 9px; background: #fff; padding: 8px 9px; font-size: 11.5px">metf</div>
+      </div>
+    </div>
+    <div>
+      <div class="kicker" style="margin-bottom: 7px">Model</div>
+      <div style="display: flex; gap: 3px; padding: 3px; background: #17243610; border-radius: 11px">
+        <button style="flex: 1; border: 0; background: #fff; color: #191d24; border-radius: 8px; padding: 7px 9px; font: 550 11px Inter, sans-serif; box-shadow: 0 1px 2px #0000000f">Common effect</button>
+        <button style="flex: 1; border: 0; background: none; color: #67727c; border-radius: 8px; padding: 7px 9px; font: 550 11px Inter, sans-serif">Random effects</button>
+      </div>
+    </div>
+  </aside>
+
+  <aside class="panel" style="position: absolute; right: 26px; top: 76px; bottom: 26px; width: 340px; padding: 20px">
+    <div class="kicker">Evidence flow</div>
+    <h2 style="margin: 6px 0 0; font-size: 19px; font-weight: 620; letter-spacing: -0.4px">acar <span style="color: #8b949d; font-weight: 450">vs</span> metf</h2>
+    <p style="margin: 6px 0 0; font-size: 11px; color: #67727c">0.29 (0.06 to 0.51) percentage points</p>
+    <dl style="margin: 18px 0 0; display: flex; flex-direction: column; gap: 1px; background: #17243612; border: 1px solid #1724361f; border-radius: 11px; overflow: hidden">
+      <div class="row"><dt>Direct evidence</dt><dd>10.2%</dd></div>
+      <div class="row"><dt>Mean path length</dt><dd>2.18 comparisons</dd></div>
+      <div class="row"><dt>Minimal parallelism</dt><dd>1.86 streams</dd></div>
+    </dl>
+    <h3 style="margin: 22px 0 9px; font-size: 11px; font-weight: 650; color: #3b4652">Where the estimate comes from</h3>
+    <table style="width: 100%; border-collapse: collapse">
+      <tr><th style="text-align: left; font: 600 9.5px Inter, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #8b949d; padding-bottom: 6px; border-bottom: 1px solid #1724361f">Route</th><th style="text-align: right; font: 600 9.5px Inter, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #8b949d; padding-bottom: 6px; border-bottom: 1px solid #1724361f">Share</th></tr>
+      <tbody class="rt">
+        <tr><td>acar <span style="color: #8b949d">→</span> plac <span style="color: #8b949d">→</span> metf</td><td>39.9%</td></tr>
+        <tr><td>acar <span style="color: #8b949d">→</span> sulf <span style="color: #8b949d">→</span> metf</td><td>29.2%</td></tr>
+        <tr><td>acar <span style="color: #8b949d">→</span> plac <span style="color: #8b949d">→</span> piog <span style="color: #8b949d">→</span> metf</td><td>9.3%</td></tr>
+        <tr><td>acar <span style="color: #8b949d">→</span> metf</td><td>8.7%</td></tr>
+        <tr><td>acar <span style="color: #8b949d">→</span> plac <span style="color: #8b949d">→</span> rosi <span style="color: #8b949d">→</span> metf</td><td>4.5%</td></tr>
+        <tr><td>acar <span style="color: #8b949d">→</span> sulf <span style="color: #8b949d">→</span> rosi <span style="color: #8b949d">→</span> metf</td><td>4.4%</td></tr>
+      </tbody>
+    </table>
+    <p style="margin: 14px 0 0; font-size: 11px; line-height: 1.6; color: #67727c">Routes are found by repeatedly taking the shortest remaining path and draining it. The shares add to the whole estimate.</p>
+  </aside>
+</div>
+</x-dc>
+</body>
+</html>

@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import { detectLayout, parseTable, readNetwork } from "../src/nma/parse.js";
+import { detectLayout, inferMeasure, parseTable, readNetwork } from "../src/nma/parse.js";
 import { fitNetwork } from "../src/nma/model.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -136,4 +136,24 @@ test("every bundled example fits without error", () => {
     assert.ok(fit.treatments.length >= 3, `${example.id} has too few treatments`);
     assert.ok(Number.isFinite(fit.Q), `${example.id} has a non-finite Q`);
   }
+});
+
+/* The scale a contrast file is on is a guess, and the default has to be the
+ * harmless one: exponentiating a mean difference would move every number and
+ * the line of no difference, while leaving a log odds ratio on the log scale
+ * only fails to prettify it. */
+test("the effect measure is read from the effect column, and defaults to the identity scale", () => {
+  assert.equal(inferMeasure("lnOR"), "OR");
+  assert.equal(inferMeasure("logRR"), "RR");
+  assert.equal(inferMeasure("log_hr"), "HR");
+  assert.equal(inferMeasure("SMD"), "SMD");
+  assert.equal(inferMeasure("TE"), "MD");
+  assert.equal(inferMeasure("effect"), "MD");
+  assert.equal(inferMeasure(undefined), "MD");
+
+  const md = readNetwork("study,treat1,treat2,TE,seTE\nA,x,y,-0.42,0.19\nB,y,z,0.10,0.22");
+  assert.equal(md.measure, "MD");
+
+  const or = readNetwork("id,treat1,treat2,lnOR,selnOR\nA,x,y,-0.42,0.19\nB,y,z,0.10,0.22");
+  assert.equal(or.measure, "OR");
 });

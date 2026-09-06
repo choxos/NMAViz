@@ -31,15 +31,31 @@ export function nodeRadii(model) {
 }
 
 /* A label placed outside its node, pushed away from the middle of the canvas so
- * that it does not land on top of the network, with the box it will occupy. */
-function labelBox(label, point, radius, width, height) {
+ * that it does not land on top of the network, with the box it will occupy.
+ *
+ * Outward is right for a node in the middle of the drawing and wrong for one at
+ * its edge, where outward means under a floating panel. A label that would
+ * leave the clear rectangle is turned back toward the middle instead, which is
+ * always empty on that side because the node is at the edge.
+ */
+function labelBox(label, point, radius, width, height, box) {
   const dx = point.x - width / 2;
   const dy = point.y - height / 2;
   const length = Math.hypot(dx, dy) || 1;
   const offset = radius + 13;
-  const x = point.x + (dx / length) * offset;
+  let x = point.x + (dx / length) * offset;
   const y = point.y + (dy / length) * offset;
-  const anchor = dx > 12 ? "start" : dx < -12 ? "end" : "middle";
+  let anchor = dx > 12 ? "start" : dx < -12 ? "end" : "middle";
+
+  const room = label.length * 6.1 + 6;
+  const limits = box ?? { left: 4, right: width - 4 };
+  if (anchor === "start" && x + room > limits.right) {
+    anchor = "end";
+    x = point.x - offset;
+  } else if (anchor === "end" && x - room < limits.left) {
+    anchor = "start";
+    x = point.x + offset;
+  }
   const baseline = dy > 12 ? "hanging" : dy < -12 ? "auto" : "middle";
   // Inter at 11px runs to about 6.1 pixels a character, which is close enough
   // to reserve space with.
@@ -82,7 +98,7 @@ function placeLabels(context, sizes, emphasis) {
   const placed = new Map();
   for (const { name, i } of order) {
     const label = shortLabel(name);
-    const geometry = labelBox(label, points[i], sizes[i], width, height);
+    const geometry = labelBox(label, points[i], sizes[i], width, height, context.box);
     const clashes = boxes.some(
       (b) =>
         Math.abs(b.cx - geometry.cx) * 2 < b.w + geometry.w &&

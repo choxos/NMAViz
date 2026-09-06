@@ -150,12 +150,12 @@ export const springs = {
         <text x="${nullAt}" y="${top - 42}" text-anchor="middle">${
           isRatio(measure) ? "1" : "0"
         }, no difference</text>
-        <text x="${left}" y="${top + rows.length * gap + 34}" text-anchor="start">favors ${escape(
+        <text x="${left}" y="${top + rows.length * gap + 34}" text-anchor="start">${escape(
           treat1
-        )}</text>
-        <text x="${right}" y="${top + rows.length * gap + 34}" text-anchor="end">favors ${escape(
-          treat2
-        )}</text>
+        )} lower</text>
+        <text x="${right}" y="${top + rows.length * gap + 34}" text-anchor="end">${escape(
+          treat1
+        )} higher</text>
       </g>`;
 
     const drawn = rows

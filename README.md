@@ -59,7 +59,13 @@ study,treatment,event,n            study,treatment,mean,sd,n
 
 Arm-level data is converted with the same formulas `netmeta::pairwise` uses, including the
 continuity correction for a study with a zero cell. Common column names are recognized
-automatically (`t1`, `lnOR`, `selnOR`, `trial`, `author`, and so on).
+automatically (`t1`, `lnOR`, `selnOR`, `trial`, `author`, and so on), and the data panel shows the
+mapping it settled on.
+
+A contrast-level file carries numbers but not the scale they are on, so the effect measure is
+guessed from the name of the effect column and defaults to the identity scale, where the numbers
+are shown exactly as the file gave them. The data panel names the guess and lets you correct it;
+correcting it matters, because a ratio measure is fitted on the log scale and shown exponentiated.
 
 Pooled results alone are not enough, and the site says so rather than guessing: every lens here
 reads the hat matrix, and the hat matrix is built from the individual studies.
@@ -83,8 +89,8 @@ numbers rather than to itself:
 - the internal sort order and the multi-arm variance adjustment, row by row
 - the evidence flow measures, and the contribution matrices under both methods
 
-Everything above agrees to at least eight decimal places, except the shortest path contribution
-method, which is held to a looser tolerance on purpose: when several routes of equal length are
+Everything above agrees to at least seven decimal places, and most of it to nine, except the
+shortest path contribution method, which is held to a looser tolerance on purpose: when several routes of equal length are
 available it drains whichever the implementation finds first, and that ambiguity is exactly what
 the random walk method was introduced to remove.
 
@@ -190,3 +196,7 @@ The lenses implement, in order:
 
 The reference implementation this engine is tested against is Schwarzer G, Carpenter JR, Rücker G.
 *netmeta: Network Meta-Analysis using Frequentist Methods*, R package version 3.6.1.
+
+Multilevel network meta-regression, which the reading behind this project also covers, is a way to
+adjust a network for differences between populations rather than a way to look at one. It is not
+implemented here, and nothing on the site is population adjusted.

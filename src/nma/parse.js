@@ -152,12 +152,34 @@ const asNumber = (value, column, line) => {
 /* ---- Effect measures ----------------------------------------------------- */
 
 export const MEASURES = {
-  OR: { label: "Odds ratio", log: true, kind: "binary" },
-  RR: { label: "Risk ratio", log: true, kind: "binary" },
-  RD: { label: "Risk difference", log: false, kind: "binary" },
   MD: { label: "Mean difference", log: false, kind: "continuous" },
   SMD: { label: "Standardized mean difference", log: false, kind: "continuous" },
+  RD: { label: "Risk difference", log: false, kind: "binary" },
+  OR: { label: "Odds ratio", log: true, kind: "binary" },
+  RR: { label: "Risk ratio", log: true, kind: "binary" },
+  HR: { label: "Hazard ratio", log: true, kind: "binary" },
+  IRR: { label: "Incidence rate ratio", log: true, kind: "binary" },
 };
+
+/* What scale a contrast-level file is on, guessed from the name of its effect
+ * column.
+ *
+ * This matters more than it looks. A ratio measure is fitted on the log scale
+ * and shown exponentiated, so guessing "odds ratio" for a file of mean
+ * differences would exponentiate every number on the site and move the line of
+ * no difference from zero to one. The guess therefore defaults to the identity
+ * scale, which leaves the numbers as the file gave them, and the interface
+ * offers the reader the choice rather than deciding silently.
+ */
+export function inferMeasure(column) {
+  const name = normalize(column ?? "");
+  if (/^(se)?(ln|log)?or$/.test(name) || name.includes("odds")) return "OR";
+  if (/^(se)?(ln|log)?rr$/.test(name) || name.includes("riskratio")) return "RR";
+  if (/^(se)?(ln|log)?hr$/.test(name) || name.includes("hazard")) return "HR";
+  if (/^(se)?(ln|log)?irr$/.test(name) || name.includes("rate")) return "IRR";
+  if (name.includes("smd")) return "SMD";
+  return "MD";
+}
 
 /* Contrast between two binary arms. netmeta adds 0.5 to every cell of a study
  * that has a zero cell, not to every study, so the increment is decided for the
@@ -290,7 +312,10 @@ export function readNetwork(text, { measure = "OR", overrides = {} } = {}) {
     return {
       layout: "contrast",
       columns,
-      measure,
+      // The caller's measure only describes arm-level conversion; a
+      // contrast-level file arrives already on its own scale, so the scale is
+      // read from the column name rather than assumed.
+      measure: inferMeasure(columns.TE),
       contrasts: readContrasts(table, columns),
       dropped: [],
     };

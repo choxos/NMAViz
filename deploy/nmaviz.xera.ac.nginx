@@ -19,12 +19,14 @@
 # adding the listen 443 block, the certificate paths and the 80 to 443
 # redirect, exactly as it did for the sibling sites on this box.
 #
-# There is deliberately no add_header block here. The site loads nothing from
-# any other origin: no analytics, no CDN, no web fonts, and it makes no network
-# requests at all after the page loads. So the box-wide policy in
-# /etc/nginx/conf.d/security.conf already covers it, and since nginx does not
-# merge add_header directives across levels, declaring even one header here
-# would silently drop the other four.
+# There is deliberately no add_header anywhere in this file, in any block. The
+# site loads nothing from any other origin: no analytics, no CDN, no web fonts,
+# and it makes no network requests at all after the page loads. So the box-wide
+# policy in /etc/nginx/conf.d/security.conf already covers it, and since nginx
+# does not merge add_header directives across levels, declaring even one header
+# in a location would silently drop all five security headers on everything
+# that location serves. The caching below therefore uses expires, which sets
+# Cache-Control without taking part in that inheritance.
 
 # IPv4 only, exactly like every sibling vhost on this box. This is deliberate.
 # nmaviz.xera.ac is an A record, and no other vhost here binds [::]:80. If this
@@ -47,14 +49,14 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # Vite content-hashes these filenames, so they can be cached forever.
+    # Vite content-hashes these filenames, so they can be cached for a year.
     location /assets/ {
-        add_header Cache-Control "public, immutable, max-age=31536000";
+        expires 1y;
     }
 
     # The fonts are not content-hashed, so a new build reuses the same names.
-    # A week of caching, never immutable.
+    # A week, not a year.
     location /fonts/ {
-        add_header Cache-Control "public, max-age=604800";
+        expires 7d;
     }
 }

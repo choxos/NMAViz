@@ -14,7 +14,7 @@ import { nodeRadii } from "./lenses/draw.js";
 import { activeModel, load, state, subscribe, update } from "./state.js";
 import { ICONS, escape, number, percent, shortLabel } from "./ui.js";
 import examples from "../data/examples.json";
-import { readNetwork } from "../nma/parse.js";
+import { readNetwork, MEASURES } from "../nma/parse.js";
 
 const THEME_KEY = "nmaviz-theme";
 const currentTheme = () =>
@@ -37,7 +37,8 @@ function setTheme(theme) {
 function shell() {
   const lensButtons = LENSES.map(
     (lens) => `
-      <button class="lens-button" type="button" data-lens="${lens.id}" title="${escape(lens.tagline)}">
+      <button class="lens-button" type="button" data-lens="${lens.id}"
+        aria-label="${escape(lens.name)}" title="${escape(lens.name)}. ${escape(lens.tagline)}">
         ${lens.mark}<span>${escape(lens.name)}</span>
       </button>`
   ).join("");
@@ -181,6 +182,54 @@ function renderOverlay() {
     state.panel === "data" ? dataPanel() : aboutPanel();
 }
 
+/* What was made of an uploaded file, and the one thing the file cannot say.
+ *
+ * The columns are a guess and the scale is a guess. Both are shown, and the
+ * scale is a control rather than a fact, because getting it wrong is not a
+ * small error: a ratio measure is exponentiated everywhere on the site.
+ */
+function uploadSection() {
+  const upload = state.dataset?.upload;
+  if (!upload) return "";
+
+  const columns = Object.entries(upload.columns)
+    .filter(([, name]) => name)
+    .map(([role, name]) => `<li><span>${escape(role)}</span><code>${escape(name)}</code></li>`)
+    .join("");
+
+  const options = Object.entries(MEASURES)
+    .map(
+      ([id, m]) =>
+        `<option value="${id}"${id === state.dataset.measure ? " selected" : ""}>${escape(
+          m.label
+        )}${m.log ? " (shown exponentiated)" : ""}</option>`
+    )
+    .join("");
+
+  const dropped = upload.dropped.length
+    ? `<p class="sheet-note">Left out: ${escape(upload.dropped.join("; "))}.</p>`
+    : "";
+
+  return `
+    <section>
+      <h3>What was read from ${escape(state.dataset.name)}</h3>
+      <p class="sheet-note">
+        ${state.rows.length} comparisons, in the ${upload.layout} level layout.
+      </p>
+      <ul class="column-map">${columns}</ul>
+      ${dropped}
+      <label class="field">
+        <span>Effect measure</span>
+        <select id="measure-select">${options}</select>
+      </label>
+      <p class="sheet-note">
+        A file carries numbers, not a scale. This was guessed from the name of the effect column;
+        a ratio measure is fitted on the log scale and shown exponentiated, so correct it here if
+        the guess is wrong.
+      </p>
+    </section>`;
+}
+
 function dataPanel() {
   const cards = examples
     .map(
@@ -201,6 +250,7 @@ function dataPanel() {
       </div>
       ${state.error ? `<p class="error">${escape(state.error)}</p>` : ""}
       <div class="sheet-body">
+        ${uploadSection()}
         <section>
           <h3>Your own file</h3>
           <p class="sheet-note">
@@ -415,6 +465,9 @@ function renderStage() {
     layoutMeta: meta,
     width,
     height,
+    // The clear rectangle the panels leave behind, so a label can be turned
+    // back inward rather than sliding under the inspector.
+    box,
     measure: state.dataset?.measure ?? "MD",
     dataset: state.dataset,
   };
@@ -471,11 +524,18 @@ async function loadFile(file) {
         id: `upload:${file.name}`,
         name: file.name,
         summary: `${network.contrasts.length} comparisons read from your file.`,
-        outcome: network.layout === "arm" ? `Effect on the ${network.measure} scale` : "Effect",
+        outcome: MEASURES[network.measure].label,
         unit: "",
         measure: network.measure,
         favors: "lower",
         source: "Uploaded in this browser.",
+        // Kept so the data panel can show what was read and let the reader
+        // correct the one guess that cannot be made from the numbers alone.
+        upload: {
+          layout: network.layout,
+          columns: network.columns,
+          dropped: network.dropped,
+        },
       },
       network.contrasts
     );
@@ -540,6 +600,16 @@ function wire() {
     }
     if (event.target.id === "file-input" && event.target.files[0])
       loadFile(event.target.files[0]);
+    if (event.target.id === "measure-select") {
+      const measure = event.target.value;
+      update({
+        dataset: {
+          ...state.dataset,
+          measure,
+          outcome: MEASURES[measure].label,
+        },
+      });
+    }
   });
 
   app.addEventListener("input", (event) => {

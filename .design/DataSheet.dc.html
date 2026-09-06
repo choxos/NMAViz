@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;550;600;620;650;750&display=swap">
+  <style>
+    body { margin: 0; font-family: Inter, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #2f5a8c; } a:hover { color: #23345e; }
+    .panel { background: #fffffff2; border: 1px solid #1724361f; border-radius: 15px; box-shadow: 0 1px 2px #2433440a, 0 2px 6px #24334408, 0 18px 48px #2433440d; }
+    .note { font-size: 11.5px; line-height: 1.65; color: #67727c; max-width: 74ch; }
+    .note code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px; padding: 1px 4px; border-radius: 4px; background: #17243610; color: #3b4652; }
+    .example { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; text-align: left; padding: 13px; border-radius: 12px; background: #fff; border: 0; }
+    .example strong { font-size: 12.5px; font-weight: 620; color: #191d24; }
+    .example .meta { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #b4653a; }
+    .example .sum { font-size: 11px; line-height: 1.55; color: #67727c; }
+  </style>
+</helmet>
+
+<div style="position: relative; width: 1280px; height: 720px; background: #f2f1ee; overflow: hidden">
+
+  <svg viewBox="0 0 1280 720" style="position: absolute; inset: 0; width: 1280px; height: 720px; opacity: 0.5">
+    <g stroke="#7a8794" stroke-linecap="round" fill="none">
+      <path d="M395 322 L510 268" stroke-width="4.4"/><path d="M510 268 L624 394" stroke-width="5.8"/>
+      <path d="M624 394 L545 388" stroke-width="6.2"/><path d="M624 394 L625 348" stroke-width="7.4"/>
+      <path d="M624 394 L575 468" stroke-width="4"/><path d="M624 394 L843 371" stroke-width="2"/>
+    </g>
+  </svg>
+
+  <div style="position: absolute; inset: 0; background: #0b111799; backdrop-filter: blur(3px); display: grid; place-items: center; padding: 30px; box-sizing: border-box">
+    <div class="panel" style="width: 880px; max-height: 660px; display: flex; flex-direction: column; padding: 0; overflow: hidden">
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid #1724361f">
+        <h2 style="margin: 0; font-size: 17px; font-weight: 620; letter-spacing: -0.3px; color: #191d24">Data</h2>
+        <div style="width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid #1724361f; border-radius: 11px; background: #fff; color: #3b4652">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </div>
+      </div>
+
+      <div style="padding: 22px; display: flex; flex-direction: column; gap: 26px; overflow: hidden">
+        <section>
+          <h3 style="margin: 0 0 8px; font-size: 12px; font-weight: 650; color: #191d24">Your own file</h3>
+          <p class="note">A CSV or tab separated file, read in this browser and never uploaded anywhere. Contrast level needs <code>treat1</code>, <code>treat2</code>, <code>TE</code> and <code>seTE</code>, with a study column. Arm level needs a study column, a <code>treatment</code> column, <code>n</code>, and either <code>event</code> or <code>mean</code> and <code>sd</code>.</p>
+          <div style="margin: 12px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 26px; border: 1.5px dashed #1724361f; border-radius: 13px; background: #17243610; font-size: 11.5px; color: #67727c">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#8b949d" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16"/></svg>
+            <span>Choose a file, or drop one here</span>
+          </div>
+          <p class="note">Pooled results alone are not enough: every lens here reads the hat matrix, which is built from the individual studies.</p>
+        </section>
+
+        <section>
+          <h3 style="margin: 0 0 8px; font-size: 12px; font-weight: 650; color: #191d24">Example networks</h3>
+          <p class="note" style="margin: 0 0 12px">The 13 networks distributed with the R package netmeta, converted to contrast level.</p>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px">
+            <div class="example">
+              <strong>Diabetes: glucose lowering agents</strong>
+              <span class="meta">Mean difference in HbA1c</span>
+              <span class="sum">Ten oral treatments for type 2 diabetes on the change in HbA1c.</span>
+            </div>
+            <div class="example">
+              <strong>COPD: mortality on inhaled treatments</strong>
+              <span class="meta">Odds ratio for mortality</span>
+              <span class="sum">Three trials, one of them four-armed. Small enough to follow every path by eye.</span>
+            </div>
+            <div class="example">
+              <strong>Depression in primary care</strong>
+              <span class="meta">Odds ratio for early response</span>
+              <span class="sum">Ninety-three trials of twenty-two treatments, the largest network here.</span>
+            </div>
+            <div class="example">
+              <strong>Atrial fibrillation: stroke prevention</strong>
+              <span class="meta">Odds ratio for stroke</span>
+              <span class="sum">Several trials have a zero event count, so the continuity correction is visible.</span>
+            </div>
+            <div class="example">
+              <strong>Smoking cessation counselling</strong>
+              <span class="meta">Odds ratio for cessation</span>
+              <span class="sum">Four counselling strategies and several three-arm trials.</span>
+            </div>
+            <div class="example">
+              <strong>Textbook network of four treatments</strong>
+              <span class="meta">Effect, arbitrary units</span>
+              <span class="sum">Every effect 1, every standard error 1, so the arithmetic can be checked by hand.</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
