@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f3f4f4" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Visualize the evidence structure of a network meta-analysis. Upload your data and read the network as an electrical circuit, a flow of evidence, a random walk, a diffusion, and more."
+    />
+    <title>NMAViz | Reading the network in a network meta-analysis</title>
+  </head>
+  <body>
+    <script>
+      // Resolve the theme before the first paint, so a dark mode reader never
+      // sees a white flash. The stored choice wins; otherwise follow the system.
+      (() => {
+        let theme;
+        try {
+          theme = localStorage.getItem("nmaviz-theme");
+        } catch {}
+        if (theme !== "dark" && theme !== "light")
+          theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
