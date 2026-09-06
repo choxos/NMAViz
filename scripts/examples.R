@@ -244,8 +244,8 @@ add(
 data(smokingcessation)
 add(
   id = "smokingcessation",
-  name = "Smoking cessation counselling",
-  summary = "The twenty-four trial network from the NICE technical support documents, with four counselling strategies and several three-arm trials.",
+  name = "Smoking cessation counseling",
+  summary = "The twenty-four trial network from the NICE technical support documents, with four counseling strategies and several three-arm trials.",
   outcome = "Odds ratio for cessation",
   unit = "odds ratio",
   measure = "OR",

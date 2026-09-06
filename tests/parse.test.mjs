@@ -147,9 +147,10 @@ test("the effect measure is read from the effect column, and defaults to the ide
   assert.equal(inferMeasure("logRR"), "RR");
   assert.equal(inferMeasure("log_hr"), "HR");
   assert.equal(inferMeasure("SMD"), "SMD");
-  assert.equal(inferMeasure("TE"), "MD");
-  assert.equal(inferMeasure("effect"), "MD");
-  assert.equal(inferMeasure(undefined), "MD");
+  // Every neutral alias the column detector accepts has to land on the
+  // identity scale, since none of them says anything about the scale.
+  for (const name of ["TE", "effect", "yi", "y", "estimate", "md", "diff", undefined])
+    assert.equal(inferMeasure(name), "MD", `${name} should be read on the identity scale`);
 
   const md = readNetwork("study,treat1,treat2,TE,seTE\nA,x,y,-0.42,0.19\nB,y,z,0.10,0.22");
   assert.equal(md.measure, "MD");
