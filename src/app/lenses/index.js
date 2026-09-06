@@ -7,5 +7,6 @@
 
 import { network } from "./network.js";
 import { flow } from "./flow.js";
+import { contributions } from "./contributions.js";
 
-export const LENSES = [network, flow];
+export const LENSES = [network, flow, contributions];

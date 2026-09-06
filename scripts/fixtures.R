@@ -86,9 +86,13 @@ capture <- function(net, data, heavy = TRUE) {
       minpar = measures$minpar
     ),
     contrib = if (heavy) {
+      sp <- netcontrib(net, method = "shortestpath")$common
+      rw <- netcontrib(net, method = "randomwalk")$common
       list(
-        shortestpath = netcontrib(net, method = "shortestpath")$common,
-        randomwalk = netcontrib(net, method = "randomwalk")$common
+        target = rownames(sp),
+        comparison = colnames(sp),
+        shortestpath = sp,
+        randomwalk = rw
       )
     } else NULL,
     decomp = list(
