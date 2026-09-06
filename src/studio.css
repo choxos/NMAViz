@@ -16,7 +16,7 @@
   align-items: center;
   gap: 2px;
   padding: 4px;
-  max-width: min(760px, calc(100vw - 620px));
+  max-width: min(900px, calc(100vw - 560px));
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -31,8 +31,8 @@
   box-shadow: none;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 8px 10px;
   border-radius: 11px;
   color: var(--muted);
   font-size: 12px;
@@ -982,4 +982,82 @@ input[type="range"] {
 .hodge-plate {
   fill: var(--accent);
   stroke: none;
+}
+
+/* ---- Reconstruction lens --------------------------------------------------- */
+
+.waterfall rect {
+  transition: opacity 0.16s ease;
+}
+
+.waterfall.up rect {
+  fill: var(--favors-right);
+}
+
+.waterfall.down rect {
+  fill: var(--favors-left);
+}
+
+.waterfall:hover rect {
+  opacity: 0.7;
+}
+
+.waterfall-carry {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.waterfall-label {
+  font-size: 10.5px;
+  fill: var(--muted);
+  text-anchor: start;
+}
+
+.waterfall-total line {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+
+.waterfall-total text {
+  font-size: 10.5px;
+  font-weight: 600;
+  fill: var(--accent);
+}
+
+.tension line {
+  stroke: var(--neutral-edge);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.tension circle {
+  fill: var(--ink-soft);
+}
+
+.tension text {
+  font-size: 10.5px;
+  fill: var(--muted);
+}
+
+.tension.network line {
+  stroke: var(--accent);
+}
+
+.tension.network circle {
+  fill: var(--accent);
+}
+
+.tension.network text {
+  fill: var(--ink);
+  font-weight: 600;
+}
+
+.study-table td.up {
+  color: var(--favors-right);
+}
+
+.study-table td.down {
+  color: var(--favors-left);
 }
