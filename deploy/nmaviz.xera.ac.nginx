@@ -1,0 +1,60 @@
+# NMAViz nginx vhost. Serves the static Vite build in /var/www/nmaviz/dist.
+#
+# deploy/deploy.sh copies this file to the server's home directory on every run,
+# so ~/nmaviz.xera.ac.nginx is always a fresh copy of this file.
+#
+# First install (needs root):
+#   sudo cp ~/nmaviz.xera.ac.nginx /etc/nginx/sites-available/nmaviz.xera.ac
+#   sudo ln -sfn /etc/nginx/sites-available/nmaviz.xera.ac /etc/nginx/sites-enabled/nmaviz.xera.ac
+#   sudo nginx -t && sudo systemctl reload nginx
+#   sudo certbot --nginx -d nmaviz.xera.ac --agree-tos -m ahmad.pub@gmail.com --redirect
+#
+# AFTER certbot has run, do NOT copy this file over the installed one again:
+# certbot rewrote that file in place to add the TLS block, and this copy is
+# still HTTP only, so overwriting it would take the certificate configuration
+# with it. Content changes need no nginx action at all; deploy.sh rebuilds
+# dist/ and nginx serves the new files immediately.
+#
+# This file is HTTP-only on purpose. certbot --nginx rewrites it in place,
+# adding the listen 443 block, the certificate paths and the 80 to 443
+# redirect, exactly as it did for the sibling sites on this box.
+#
+# There is deliberately no add_header block here. The site loads nothing from
+# any other origin: no analytics, no CDN, no web fonts, and it makes no network
+# requests at all after the page loads. So the box-wide policy in
+# /etc/nginx/conf.d/security.conf already covers it, and since nginx does not
+# merge add_header directives across levels, declaring even one header here
+# would silently drop the other four.
+
+# IPv4 only, exactly like every sibling vhost on this box. This is deliberate.
+# nmaviz.xera.ac is an A record, and no other vhost here binds [::]:80. If this
+# file were the only one to bind it, nginx would make this server block the
+# DEFAULT for IPv6 port 80, and an IPv6 request for any OTHER xera.ac site would
+# land on this site. Matching the siblings avoids that entirely.
+server {
+    listen 80;
+    server_name nmaviz.xera.ac;
+
+    root /var/www/nmaviz/dist;
+    index index.html;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    # Single page app: unknown paths fall back to the shell.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Vite content-hashes these filenames, so they can be cached forever.
+    location /assets/ {
+        add_header Cache-Control "public, immutable, max-age=31536000";
+    }
+
+    # The fonts are not content-hashed, so a new build reuses the same names.
+    # A week of caching, never immutable.
+    location /fonts/ {
+        add_header Cache-Control "public, max-age=604800";
+    }
+}
