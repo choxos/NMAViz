@@ -80,6 +80,75 @@
   --shadow: 0 1px 2px #00000040, 0 2px 8px #00000038, 0 18px 48px #00000045;
 }
 
+/* A third theme, for reading the network the way Rücker's paper asks you to.
+ *
+ * The paper's claim is that an evidence network IS an electrical network, and a
+ * bench instrument is what you would actually read one on. So the palette is a
+ * phosphor screen: one background, one trace color, one warning color, and
+ * nothing else competing for attention. It is restrained on purpose. A serious
+ * tool can look like an oscilloscope; it cannot look like a toy, so there is no
+ * flashing, no pixel type in running text, and every number stays exactly as
+ * legible as it is in the other two themes. */
+:root[data-theme="arcade"] {
+  color-scheme: dark;
+
+  --ink: #d6f7e4;
+  --ink-soft: #9fdcbc;
+  --muted: #6fae8d;
+  --faint: #4d876c;
+
+  --brand: #35e07f;
+  --on-brand: #04140b;
+  --link: #6df0a4;
+  --accent: #ffb44a;
+  --accent-soft: #ffb44a26;
+
+  --favors-left: #4fd3e0;
+  --favors-right: #ffb44a;
+  --neutral-edge: #3f8f68;
+
+  --stage: #050a08;
+  --glass: #08130ded;
+  --surface: #0a1710;
+  --wash: #35e07f12;
+  --wash-firm: #35e07f22;
+  --line: #35e07f2e;
+  --line-soft: #35e07f1a;
+  --scrollbar: #2b6a4a;
+
+  --shadow: 0 0 0 1px #35e07f14, 0 2px 10px #00000066, 0 20px 52px #000000aa;
+}
+
+/* Numbers are what this screen is for, so they get the instrument face. Running
+   prose stays in Inter, which is far easier to read at 11px. */
+:root[data-theme="arcade"] .numeric,
+:root[data-theme="arcade"] dd,
+:root[data-theme="arcade"] .readouts,
+:root[data-theme="arcade"] .tip-rows dd,
+:root[data-theme="arcade"] output {
+  font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+  letter-spacing: -0.01em;
+}
+
+/* The faint glow a phosphor screen has, on the traces only. Text is left alone,
+   because a glow on 11px type is how a readable interface stops being one. */
+:root[data-theme="arcade"] .stage {
+  filter: drop-shadow(0 0 2px #35e07f40);
+}
+
+/* A deeper vignette, and deliberately no scanlines. A scanline pattern laid
+   over a plot is texture the reader has to see past to read a number, and this
+   screen exists to be read. */
+:root[data-theme="arcade"] .vignette {
+  background: radial-gradient(120% 90% at 50% 45%, #00000000 38%, #000000c4 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="arcade"] .stage {
+    filter: none;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

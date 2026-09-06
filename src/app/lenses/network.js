@@ -10,6 +10,8 @@
 
 import { effect, escape, number, percent } from "../ui.js";
 import { arc, contrastEmphasis, drawNodes, hit, nodeRadii, scaleBetween } from "./draw.js";
+import { resistorPath, sourceBranch } from "./circuitry.js";
+import { evidenceFlow } from "../../nma/flow.js";
 
 function edgeGeometry(context) {
   const { model, points, state } = context;
@@ -45,6 +47,21 @@ function edgeGeometry(context) {
   });
 }
 
+/* Plain wires or circuit symbols. Rücker's reading is not an alternative model,
+ * it is what the model already is, so this is a style rather than a lens. */
+const STYLES = { plain: "Plain", circuit: "Circuit" };
+
+function stylePills(state) {
+  return Object.entries(STYLES)
+    .map(
+      ([id, label]) =>
+        `<button type="button" data-option="style" data-value="${id}" class="${
+          (state.options.style ?? "plain") === id ? "active" : ""
+        }">${label}</button>`
+    )
+    .join("");
+}
+
 function inspector(context) {
   const { model, state, measure, dataset } = context;
   if (!state.contrast) return "";
@@ -77,6 +94,11 @@ function inspector(context) {
     : "";
 
   return `
+    <div class="lens-options">
+      <span class="control-label">Drawing</span>
+      <div class="pills">${stylePills(state)}</div>
+    </div>
+
     <header class="inspector-head">
       <span class="inspector-kind">Comparison</span>
       <h2>${escape(state.contrast.treat1)} <span class="versus">vs</span> ${escape(
@@ -147,6 +169,121 @@ function inspector(context) {
   `;
 }
 
+/* The same network, drawn as the circuit it is.
+ *
+ * Nothing here is a different model. Every wire is the same comparison at the
+ * same place with the same width; what is added is the resistor symbol, the
+ * junction dots, and the source branch that says which question is being put to
+ * the circuit. See circuitry.js for what each symbol carries.
+ */
+function circuit(context, geometry, emphasis) {
+  const { model, state, box } = context;
+
+  // On a large network a resistor on every wire is a field of zigzags. Above
+  // this many comparisons the symbol is kept for the wires that carry the
+  // current for the comparison being asked about, and the rest stay plain.
+  const dense = model.direct.length > 26;
+  const flowing = state.contrast
+    ? new Map(
+        evidenceFlow(model, state.contrast.treat1, state.contrast.treat2)?.edges.map((e) => [
+          `${e.comparison.treat1} ${e.comparison.treat2}`,
+          e.flow,
+        ]) ?? []
+      )
+    : null;
+  // On a large network the symbol is kept only where the current runs.
+  const currents = dense ? flowing : null;
+  const liveEdges = flowing;
+  let suppressed = 0;
+
+  const wires = geometry
+    .map(({ edge, a, b, width, strands }) => {
+      const key = `${edge.treat1} ${edge.treat2}`;
+      const carrying =
+        state.contrast &&
+        ((edge.treat1 === state.contrast.treat1 && edge.treat2 === state.contrast.treat2) ||
+          (edge.treat2 === state.contrast.treat1 && edge.treat1 === state.contrast.treat2));
+      const wanted = !dense || (currents?.get(key) ?? 0) > 1e-6;
+      const drawn = wanted ? resistorPath(a, b) : { d: arc(a, b), symbol: false };
+      const { d, symbol } = drawn;
+      if (!symbol) suppressed += 1;
+
+      // With the separation control open the comparison comes apart into its
+      // studies, which in circuit terms is what it always was: conductances in
+      // parallel between the same two junctions.
+      const parallel =
+        state.separation > 0.02
+          ? strands
+              .map(
+                (strand) =>
+                  `<path class="wire-strand" data-study="${escape(
+                    strand.row.studlab
+                  )}" d="${strand.path}" stroke-width="${strand.width.toFixed(2)}"/>`
+              )
+              .join("")
+          : "";
+
+      // Where current actually runs, a second stroke slides along the wire. The
+      // speed is the same everywhere on purpose: in a conductor it is the cross
+      // section that carries the current, so here it is the width and only the
+      // width that says how much evidence travels this way.
+      const live = (currents ?? liveEdges)?.get(key) ?? 0;
+      return `
+        <g class="wire${carrying ? " carrying" : ""}${symbol ? "" : " bare"}" data-edge="${escape(
+          key
+        )}">
+          ${hit(arc(a, b))}
+          <path class="wire-line" d="${d}" stroke-width="${width.toFixed(2)}"/>
+          ${
+            live > 1e-4
+              ? `<path class="wire-current" d="${d}" stroke-width="${Math.max(
+                  1,
+                  width * 0.5
+                ).toFixed(2)}"/>`
+              : ""
+          }
+          ${parallel}
+        </g>`;
+    })
+    .join("");
+
+  // The source is not evidence, so it is drawn outside the network and dashed.
+  let source = "";
+  if (state.contrast) {
+    const a = context.points[model.index.get(state.contrast.treat1)];
+    const b = context.points[model.index.get(state.contrast.treat2)];
+    if (a && b) {
+      const branch = sourceBranch(a, b, box);
+      source = `
+        <g class="source">
+          <path class="source-wire" d="${branch.d}"/>
+          ${branch.source}
+        </g>`;
+    }
+  }
+
+  return {
+    stage: `<g class="source-layer">${source}</g><g class="wires">${wires}</g>
+      <g class="nodes">${drawNodes(context, { emphasis, radii: nodeRadii(model) })}</g>`,
+    inspector: inspector(context),
+    style: "circuit",
+    note:
+      (state.contrast
+        ? `The source outside the network drives one unit of current from ${escape(
+            state.contrast.treat1
+          )} to ${escape(
+            state.contrast.treat2
+          )}; the potential difference it produces is the estimate and the resistance it meets is the variance. `
+        : "") +
+      `Wire width is precision and wire length is the standard error, as closely as two dimensions allow.` +
+      (suppressed
+        ? ` ${suppressed} ${
+            suppressed === 1 ? "wire is" : "wires are"
+          } drawn plain for room; a plain wire here still has resistance.`
+        : ""),
+  };
+}
+
 export const network = {
   // Draws the treatments where the shared arrangement puts them, so the
   // reader can pick one up and move it.
@@ -162,9 +299,12 @@ export const network = {
     const { model, state, measure } = context;
     const geometry = edgeGeometry(context);
     const emphasis = contrastEmphasis(state);
+    const style = state.options.style === "circuit" ? "circuit" : "plain";
+
+    if (style === "circuit") return circuit(context, geometry, emphasis);
 
     const edges = geometry
-      .map(({ edge, strands, width }) => {
+      .map(({ edge, a, b, strands, width }) => {
         const key = `${edge.treat1} ${edge.treat2}`;
         const highlighted =
           state.contrast &&

@@ -17,19 +17,34 @@ import { ICONS, escape, number, percent, shortLabel } from "./ui.js";
 import examples from "../data/examples.json";
 import { readNetwork, MEASURES } from "../nma/parse.js";
 
+/* Three themes, cycled by the one button: paper, night, and the instrument.
+ *
+ * The third exists because Rücker's claim is that an evidence network is an
+ * electrical network, and a bench instrument is what you would read one on. It
+ * changes the palette and the numerals and nothing else: every number stays
+ * exactly as legible, and no texture is laid over the plot. */
 const THEME_KEY = "nmaviz-theme";
-const currentTheme = () =>
-  document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+const THEMES = {
+  light: { next: "dark", icon: "moon", label: "Switch to the night theme" },
+  dark: { next: "arcade", icon: "scope", label: "Switch to the instrument theme" },
+  arcade: { next: "light", icon: "sun", label: "Switch back to the paper theme" },
+};
+
+const currentTheme = () => {
+  const set = document.documentElement.dataset.theme;
+  return set in THEMES ? set : "light";
+};
 
 function setTheme(theme) {
-  document.documentElement.dataset.theme = theme;
+  const chosen = theme in THEMES ? theme : "light";
+  document.documentElement.dataset.theme = chosen;
   try {
-    localStorage.setItem(THEME_KEY, theme);
+    localStorage.setItem(THEME_KEY, chosen);
   } catch {}
   const button = document.querySelector("#theme-toggle");
   if (!button) return;
-  button.innerHTML = theme === "dark" ? ICONS.sun : ICONS.moon;
-  button.title = theme === "dark" ? "Switch to the light theme" : "Switch to the dark theme";
+  button.innerHTML = ICONS[THEMES[chosen].icon];
+  button.title = THEMES[chosen].label;
   button.setAttribute("aria-label", button.title);
 }
 
@@ -567,6 +582,11 @@ function renderStage() {
   setAnimation(Boolean(lens.animate));
   const drawn = lens.draw(context);
   stage.innerHTML = drawn.stage;
+  // A lens can ask for a different skin. The circuit style restyles the shared
+  // node drawing into junction dots, which is a CSS matter rather than a
+  // different set of shapes.
+  if (drawn.style) stage.dataset.style = drawn.style;
+  else delete stage.dataset.style;
   // A new lens is a new statement about the network, so it arrives rather than
   // appearing. The class is set only when the lens actually changed, otherwise
   // an animated lens would restart its entrance on every frame.
@@ -839,8 +859,7 @@ function wire() {
     if (event.target.closest("[data-close]")) return update({ panel: null, error: null });
     if (event.target.closest("#data-button")) return update({ panel: "data" });
     if (event.target.closest("#about-button")) return update({ panel: "about" });
-    if (event.target.closest("#theme-toggle"))
-      return setTheme(currentTheme() === "dark" ? "light" : "dark");
+    if (event.target.closest("#theme-toggle")) return setTheme(THEMES[currentTheme()].next);
 
     if (event.target.closest("#swap") && state.contrast)
       return update({

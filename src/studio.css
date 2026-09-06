@@ -1100,6 +1100,113 @@ input[type="range"] {
   color: var(--muted);
 }
 
+/* ---- Circuit style --------------------------------------------------------- */
+
+/* Every wire is the same comparison in the same place as in the plain drawing.
+   What changes is that the symbols are drawn: a resistor in the middle of each
+   wire, junction dots at the treatments, and a source outside the network. */
+.wire-line {
+  fill: none;
+  stroke: var(--neutral-edge);
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.72;
+}
+
+.wire.carrying .wire-line {
+  stroke: var(--accent);
+  opacity: 1;
+}
+
+.wire:hover .wire-line {
+  stroke: var(--ink-soft);
+  opacity: 1;
+}
+
+/* Current running along a wire, drawn as marks travelling the way the evidence
+   travels. Only wires that actually carry current for the comparison being
+   asked about get one. */
+.wire-current {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 1 13;
+  animation: current 1.9s linear infinite;
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wire-current {
+    animation: none;
+    stroke-dasharray: 1 13;
+  }
+}
+
+.wire-strand {
+  fill: none;
+  stroke: var(--neutral-edge);
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+/* The source branch is not a comparison. Nothing in the data corresponds to it,
+   so it is the one line on the canvas that is drawn dashed. */
+.source-wire {
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 1.4;
+  stroke-dasharray: 5 4;
+  opacity: 0.5;
+}
+
+/* An ideal current source, not a battery: the current is what is imposed and
+   the voltage is what the network answers. */
+.current-source circle {
+  fill: var(--stage);
+  stroke: var(--brand);
+  stroke-width: 1.6;
+}
+
+.current-source path {
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.current-source text {
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  fill: var(--brand);
+}
+
+/* Junctions, not bubbles: in circuit style a treatment is a filled dot. */
+.stage[data-style="circuit"] .node circle {
+  fill: var(--ink);
+  stroke: var(--ink);
+}
+
+.stage[data-style="circuit"] .node.from circle,
+.stage[data-style="circuit"] .node.to circle {
+  fill: var(--brand);
+  stroke: var(--brand);
+}
+
+.stage[data-style="circuit"] .node .hit-node {
+  fill: transparent;
+  stroke: none;
+}
+
+.lens-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
 /* ---- Diffusion lens -------------------------------------------------------- */
 
 .diffusion-edge path {
