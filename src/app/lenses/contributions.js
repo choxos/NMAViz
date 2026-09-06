@@ -22,7 +22,7 @@ import {
 } from "../../nma/contributions.js";
 import { evidenceFlow } from "../../nma/flow.js";
 import { escape, percent } from "../ui.js";
-import { arc, contrastEmphasis, drawNodes, hit, scaleBetween } from "./draw.js";
+import { arc, contrastEmphasis, drawNodes, hit, scaleBetween, separable, strandsOf } from "./draw.js";
 
 function studyShares(model, contributions) {
   const shares = [];
@@ -124,6 +124,7 @@ export const contributions = {
   // Draws the treatments where the shared arrangement puts them, so the
   // reader can pick one up and move it.
   spatial: true,
+  separates: true,
   id: "contributions",
   name: "Contributions",
   tagline: "Which comparisons, and which trials, the estimate rests on",
@@ -167,6 +168,7 @@ export const contributions = {
     const shortest = shortestPathContributions(flow);
     const walk = randomWalkContributions(flow, model.treatments.length);
     const largest = Math.max(...shortest.values(), 1e-9);
+    const fanned = state.separation > 0.02 && separable(model);
 
     const edges = model.direct
       .map((edge) => {
@@ -175,13 +177,35 @@ export const contributions = {
         const a = points[model.index.get(edge.treat1)];
         const b = points[model.index.get(edge.treat2)];
         const carrying = share > 1e-6;
+        const stroke = (value) =>
+          carrying ? scaleBetween(value, 0, largest, 1.8, 13).toFixed(2) : "1";
+        // A comparison's contribution is divided among its studies in
+        // proportion to their weights, which is the arithmetic the second
+        // table below already reports. Opening the separation control puts
+        // that division on the canvas: the strands of one comparison add up to
+        // the line they replaced, so a comparison that owes its share to a
+        // single large trial looks nothing like one carried by six small ones.
+        const parallel =
+          fanned && carrying
+            ? strandsOf(edge, a, b, state.separation)
+                .map(
+                  (strand) =>
+                    `<path class="contribution-strand" data-study="${escape(
+                      strand.row.studlab
+                    )}" d="${strand.path}" stroke-width="${stroke(share * strand.share)}"><title>${
+                      escape(strand.row.studlab)
+                    }: ${percent(share * strand.share, 1)}</title></path>`
+                )
+                .join("")
+            : "";
         return `
-          <g class="contribution-edge${carrying ? "" : " idle"}" data-edge="${escape(key)}">
+          <g class="contribution-edge${carrying ? "" : " idle"}${
+            parallel ? " fanned" : ""
+          }" data-edge="${escape(key)}">
             <title>${escape(edge.treat1)} vs ${escape(edge.treat2)}: ${percent(share, 1)}</title>
             ${hit(arc(a, b))}
-            <path d="${arc(a, b)}" stroke-width="${
-              carrying ? scaleBetween(share, 0, largest, 1.8, 13).toFixed(2) : "1"
-            }"/>
+            <path d="${arc(a, b)}" stroke-width="${stroke(share)}"/>
+            ${parallel}
           </g>`;
       })
       .join("");
@@ -193,7 +217,11 @@ export const contributions = {
       inspector: inspector(context, shortest, walk),
       note: `Line width is the share of the ${escape(state.contrast.treat1)} versus ${escape(
         state.contrast.treat2
-      )} estimate that each comparison is responsible for. The shares add to one.`,
+      )} estimate that each comparison is responsible for. The shares add to one.${
+        fanned
+          ? " Each comparison is fanned into the studies on it, splitting its share by their weights."
+          : ""
+      }`,
     };
   },
 };

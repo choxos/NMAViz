@@ -46,6 +46,7 @@ export const springs = {
   // Offers controls that work the mechanism, so the canvas leaves room for
   // the deck under it.
   deck: true,
+  separates: "The springs already hang one study per coil.",
   id: "springs",
   name: "Springs",
   tagline: "The mechanism: studies in parallel, routes in series",

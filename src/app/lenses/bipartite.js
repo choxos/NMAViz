@@ -107,6 +107,7 @@ export const bipartite = {
   // Draws the treatments where the shared arrangement puts them, so the
   // reader can pick one up and move it.
   spatial: true,
+  separates: true,
   id: "bipartite",
   name: "Trials",
   tagline: "Trials as nodes, so a multi-arm trial is one object",

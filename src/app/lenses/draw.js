@@ -174,6 +174,47 @@ export function arc(a, b, bend = 0) {
   )} ${b.y.toFixed(1)}`;
 }
 
+/* A comparison taken apart into the studies behind it.
+ *
+ * Every comparison on this canvas is a bundle of conductances in parallel: the
+ * studies on it, each of weight 1/se². Whatever the comparison carries, those
+ * studies carry in proportion to their weights, and that is one fact rather
+ * than several: it is why a comparison's precision is the sum of its studies',
+ * why the current through it splits the way it does, and why a walker crossing
+ * it picks a study with that probability. So every lens that fans a comparison
+ * open fans it the same way, from here.
+ *
+ * The spread is perpendicular to the comparison and symmetric about it, so the
+ * bundle opens around the line it replaces instead of drifting off it. At a
+ * separation of zero every strand lies exactly on that line, which is what
+ * makes the control continuous rather than a switch between two pictures.
+ */
+export function strandsOf(edge, a, b, separation, { spread = 26 } = {}) {
+  const weights = edge.rows.map((row) => 1 / row.seTE ** 2);
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  const middle = (edge.rows.length - 1) / 2;
+  return edge.rows.map((row, k) => {
+    const bend = (k - middle) * spread * separation;
+    return {
+      row,
+      bend,
+      // A comparison with no usable weight anywhere splits evenly rather than
+      // dividing by zero; it has nothing to say about which study matters.
+      share: total > 0 ? weights[k] / total : 1 / edge.rows.length,
+      path: arc(a, b, bend),
+    };
+  });
+}
+
+/* Whether the strands would be legible at all.
+ *
+ * Past this many comparisons the fans of neighboring comparisons overlap and
+ * the picture says less than the single lines it replaced, so the lenses stop
+ * offering it rather than drawing a thicket.
+ */
+export const CROWDED = 26;
+export const separable = (model) => model.direct.length <= CROWDED;
+
 /* The arrow marker every directed lens uses.
  *
  * Marker units default to the stroke width, which would make the head of a

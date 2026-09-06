@@ -9,7 +9,7 @@
  */
 
 import { effect, escape, number, percent } from "../ui.js";
-import { arc, contrastEmphasis, drawNodes, hit, nodeRadii, scaleBetween } from "./draw.js";
+import { arc, contrastEmphasis, drawNodes, hit, nodeRadii, scaleBetween, strandsOf } from "./draw.js";
 import { resistorPath, sourceBranch } from "./circuitry.js";
 import { cablePath, plugMarkup, socketMarkup } from "./props.js";
 import { evidenceFlow } from "../../nma/flow.js";
@@ -26,23 +26,20 @@ function edgeGeometry(context) {
     const width = scaleBetween(Math.sqrt(precisions[index]), Math.sqrt(low), Math.sqrt(high), 1.4, 8);
 
     // The individual studies, spread perpendicular to the comparison as the
-    // separation control opens.
+    // separation control opens. Width is precision here as everywhere else, so
+    // a strand is scaled within its own comparison: the question a fanned
+    // comparison answers is which of these studies is carrying it.
     const studyPrecisions = edge.rows.map((row) => 1 / row.seTE ** 2);
-    const strands = edge.rows.map((row, k) => {
-      const centered = k - (edge.rows.length - 1) / 2;
-      const bend = centered * 26 * state.separation;
-      return {
-        row,
-        path: arc(a, b, bend),
-        width: scaleBetween(
-          Math.sqrt(studyPrecisions[k]),
-          Math.sqrt(Math.min(...studyPrecisions)),
-          Math.sqrt(Math.max(...studyPrecisions)),
-          1.2,
-          Math.max(1.6, width)
-        ),
-      };
-    });
+    const strands = strandsOf(edge, a, b, state.separation).map((strand, k) => ({
+      ...strand,
+      width: scaleBetween(
+        Math.sqrt(studyPrecisions[k]),
+        Math.sqrt(Math.min(...studyPrecisions)),
+        Math.sqrt(Math.max(...studyPrecisions)),
+        1.2,
+        Math.max(1.6, width)
+      ),
+    }));
 
     return { edge, a, b, width, strands };
   });
@@ -350,6 +347,7 @@ export const network = {
   // Draws the treatments where the shared arrangement puts them, so the
   // reader can pick one up and move it.
   spatial: true,
+  separates: true,
   id: "network",
   name: "Network",
   tagline: "Every comparison, with the studies behind it",

@@ -28,6 +28,7 @@ function tensionRow(label, estimate, seTE, measure, x, scale, y, emphasis = "") 
 }
 
 export const reconstruction = {
+  separates: "The reconstruction draws treatments, not comparisons.",
   id: "reconstruction",
   name: "Reconstruction",
   tagline: "What each trial did to this estimate, adding up to the estimate",

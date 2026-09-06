@@ -10,7 +10,17 @@
 
 import { evidenceFlow, flowPaths } from "../../nma/flow.js";
 import { effect, escape, number, percent } from "../ui.js";
-import { DEFS, arc, contrastEmphasis, drawNodes, hit, nodeRadii, scaleBetween } from "./draw.js";
+import {
+  DEFS,
+  arc,
+  contrastEmphasis,
+  drawNodes,
+  hit,
+  nodeRadii,
+  scaleBetween,
+  separable,
+  strandsOf,
+} from "./draw.js";
 import { leadPath, meterMarkup, probeMarkup } from "./props.js";
 
 function inspector(context, flow, paths) {
@@ -91,6 +101,7 @@ export const flow = {
   // Draws the treatments where the shared arrangement puts them, so the
   // reader can pick one up and move it.
   spatial: true,
+  separates: true,
   id: "flow",
   name: "Flow",
   tagline: "Where one estimate actually comes from",
@@ -130,6 +141,7 @@ export const flow = {
     const flowNetwork = evidenceFlow(model, state.contrast.treat1, state.contrast.treat2);
     const paths = flowPaths(flowNetwork);
     const largest = Math.max(...flowNetwork.edges.map((e) => e.flow), 1e-9);
+    const fanned = state.separation > 0.02 && separable(model);
 
     const edges = flowNetwork.edges
       .map((edge) => {
@@ -151,13 +163,41 @@ export const flow = {
         // that carries the current, so here it is the width and only the width
         // that means how much evidence travels this way.
         const path = arc(a, tip);
+
+        // The studies behind a comparison are conductances in parallel, so the
+        // current arriving at the comparison divides between them in exactly
+        // the proportion of their weights. That is not a way of drawing the
+        // flow, it is what the flow is doing, so the separation control splits
+        // the band into the strands that carry it.
+        const parallel =
+          fanned && carrying
+            ? strandsOf(edge.comparison, a, tip, state.separation)
+                .map((strand) => {
+                  const share = edge.flow * strand.share;
+                  return `
+                    <path class="flow-band strand" data-study="${escape(strand.row.studlab)}"
+                      d="${strand.path}" stroke-width="${scaleBetween(
+                        share,
+                        0,
+                        largest,
+                        1,
+                        11
+                      ).toFixed(2)}" marker-end="url(#flow-arrow)">
+                      <title>${escape(strand.row.studlab)}: ${percent(share, 1)} of the estimate</title>
+                    </path>`;
+                })
+                .join("")
+            : "";
+
         return `
-          <g class="flow-edge${carrying ? "" : " idle"}${edge.isTarget ? " target" : ""}"
+          <g class="flow-edge${carrying ? "" : " idle"}${edge.isTarget ? " target" : ""}${
+            parallel ? " fanned" : ""
+          }"
              data-edge="${escape(`${edge.comparison.treat1} ${edge.comparison.treat2}`)}">
             <title>${escape(edge.from)} to ${escape(edge.to)}: ${percent(edge.flow, 1)} of the estimate</title>
             ${hit(path)}
             <path class="flow-band" d="${path}" stroke-width="${width.toFixed(2)}"
-              ${carrying ? 'marker-end="url(#flow-arrow)"' : ""}/>
+              ${carrying && !parallel ? 'marker-end="url(#flow-arrow)"' : ""}/>
             ${
               carrying
                 ? `<path class="flow-current" d="${path}" stroke-width="${(width * 0.55).toFixed(
@@ -165,6 +205,7 @@ export const flow = {
                   )}"/>`
                 : ""
             }
+            ${parallel}
           </g>`;
       })
       .join("");

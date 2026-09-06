@@ -1567,6 +1567,34 @@ input[type="range"] {
   }
 }
 
+/* A comparison that has been fanned open steps back behind its own strands:
+   the reader is meant to see the studies adding up to the line, not the line
+   drawn over the studies. */
+.contribution-edge.fanned > path:not([class]),
+.diffusion-edge.fanned > path:not([class]) {
+  opacity: 0.1;
+}
+
+.flow-edge.fanned .flow-band:not(.strand) {
+  opacity: 0.08;
+}
+
+.flow-band.strand {
+  opacity: 0.5;
+}
+
+/* A control that cannot act on this lens stays where it is and says why, since
+   one that vanished between lenses would read as a fault. */
+.control-block.inert .control-label,
+.control-block.inert .control-hint {
+  opacity: 0.55;
+}
+
+.control-block.inert input[type="range"] {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .wire-strand {
   fill: none;
   stroke: var(--neutral-edge);
@@ -1640,11 +1668,20 @@ input[type="range"] {
 
 /* ---- Diffusion lens -------------------------------------------------------- */
 
-.diffusion-edge path {
+.diffusion-edge path:not(.diffusion-strand) {
   fill: none;
   stroke: var(--neutral-edge);
   stroke-width: 1.2;
   opacity: 0.3;
+}
+
+/* A strand carries its own width, which is the share of the crossings that go
+   through that trial, so this rule must not set one. */
+.diffusion-strand {
+  fill: none;
+  stroke: var(--brand);
+  stroke-linecap: round;
+  opacity: 0.5;
 }
 
 .diffusion-halo {

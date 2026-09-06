@@ -12,7 +12,7 @@ import { LAYOUTS, frame, relieveOverlap, stressOf } from "./layout.js";
 import { describe, tipMarkup } from "./tips.js";
 import { makeRig, releaseFrom, stepRig } from "./play.js";
 import { LENSES } from "./lenses/index.js";
-import { nodeRadii } from "./lenses/draw.js";
+import { nodeRadii, separable } from "./lenses/draw.js";
 import { activeModel, load, setExcluded, state, subscribe, update } from "./state.js";
 import { ICONS, escape, number, percent, shortLabel } from "./ui.js";
 import examples from "../data/examples.json";
@@ -152,7 +152,7 @@ function controlsMarkup(model) {
         Separation <output id="separation-value">0%</output>
       </label>
       <input id="separation" type="range" min="0" max="1" step="0.01" value="0" />
-      <p class="control-hint">Fan every comparison out into the individual studies behind it.</p>
+      <p class="control-hint" id="separation-hint"></p>
     </div>
 
     <p class="control-hint" id="drag-hint">
@@ -164,6 +164,32 @@ function controlsMarkup(model) {
       <button type="button" class="text-button" id="reset-arrangement">Put them back</button>
     </div>
   `;
+}
+
+/* Whether fanning a comparison into its studies says anything on this lens.
+ *
+ * It says something wherever what the lens draws on a comparison is a sum over
+ * the studies on it: precision, a share of the current, a share of the credit,
+ * the crossings of a walker. Where it is not a sum over studies, the control
+ * stays where it is and is disabled with the reason, because a control that
+ * disappears between lenses reads as a fault rather than as an answer.
+ */
+function separationOf(model) {
+  const lens = LENSES.find((entry) => entry.id === state.lens);
+  if (lens?.separates !== true)
+    return {
+      live: false,
+      hint:
+        typeof lens?.separates === "string"
+          ? lens.separates
+          : "Nothing here is drawn one study at a time.",
+    };
+  if (model && !separable(model))
+    return {
+      live: false,
+      hint: `${model.direct.length} comparisons is too many to fan apart without the strands of one running through the next.`,
+    };
+  return { live: true, hint: "Fan every comparison out into the individual studies behind it." };
 }
 
 function renderControls() {
@@ -199,6 +225,17 @@ function renderControls() {
     separation.value = String(state.separation);
   const readout = node.querySelector("#separation-value");
   if (readout) readout.textContent = `${Math.round(state.separation * 100)}%`;
+
+  // Which lens is showing is not part of the key the controls are rebuilt on,
+  // deliberately: rebuilding the panel under the pointer is what broke this
+  // slider once already. So the state of the control follows the lens the same
+  // way its value does, by being set rather than by being redrawn.
+  const fan = separationOf(model);
+  if (separation) separation.disabled = !fan.live;
+  const block = separation?.closest(".control-block");
+  if (block) block.classList.toggle("inert", !fan.live);
+  const fanHint = node.querySelector("#separation-hint");
+  if (fanHint) fanHint.textContent = fan.hint;
 
   const moved = Object.keys(state.pins).length;
   const placedBlock = node.querySelector("#arrangement-state");

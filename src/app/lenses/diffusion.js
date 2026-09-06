@@ -21,7 +21,16 @@
 
 import { diffusionMass, diffusionPartials, varianceFrom } from "../../nma/diffusion.js";
 import { effect, escape, number, onScale, percent } from "../ui.js";
-import { arc, contrastEmphasis, drawNodes, hit, nodeRadii, scaleBetween } from "./draw.js";
+import {
+  arc,
+  contrastEmphasis,
+  drawNodes,
+  hit,
+  nodeRadii,
+  scaleBetween,
+  separable,
+  strandsOf,
+} from "./draw.js";
 import { dropperMarkup } from "./props.js";
 
 const STEPS = 22;
@@ -130,6 +139,7 @@ export const diffusionLens = {
   // Draws the treatments where the shared arrangement puts them, so the
   // reader can pick one up and move it.
   spatial: true,
+  separates: true,
   id: "diffusion",
   name: "Diffusion",
   tagline: "How far the evidence had to travel to explain the uncertainty",
@@ -170,13 +180,34 @@ export const diffusionLens = {
       })
       .join("");
 
+    // A walker standing on a treatment leaves along one of the comparisons
+    // with probability in proportion to its weight, and a comparison's weight
+    // is the sum of its studies'. So a walker is really choosing a study, and
+    // the separation control shows the choice it is making: strand width is
+    // the share of the crossings that go through that trial.
+    const fanned = state.separation > 0.02 && separable(model);
     const edges = model.direct
       .map((edge) => {
         const a = points[model.index.get(edge.treat1)];
         const b = points[model.index.get(edge.treat2)];
-        return `<g class="diffusion-edge" data-edge="${escape(
+        const parallel = fanned
+          ? strandsOf(edge, a, b, state.separation)
+              .map(
+                (strand) =>
+                  `<path class="diffusion-strand" data-study="${escape(
+                    strand.row.studlab
+                  )}" d="${strand.path}" stroke-width="${(0.6 + 2.4 * strand.share).toFixed(
+                    2
+                  )}"><title>${escape(strand.row.studlab)}: ${percent(
+                    strand.share,
+                    0
+                  )} of the crossings</title></path>`
+              )
+              .join("")
+          : "";
+        return `<g class="diffusion-edge${parallel ? " fanned" : ""}" data-edge="${escape(
           `${edge.treat1} ${edge.treat2}`
-        )}">${hit(arc(a, b))}<path d="${arc(a, b)}"/></g>`;
+        )}">${hit(arc(a, b))}<path d="${arc(a, b)}"/>${parallel}</g>`;
       })
       .join("");
 

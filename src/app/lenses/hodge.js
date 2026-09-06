@@ -152,6 +152,7 @@ export const hodgeLens = {
   // Draws the treatments where the shared arrangement puts them, so the
   // reader can pick one up and move it.
   spatial: true,
+  separates: "A loop's inconsistency belongs to the comparisons in it, not to any one study.",
   id: "hodge",
   name: "Inconsistency",
   tagline: "The disagreement triangles can see, and the disagreement they cannot",
