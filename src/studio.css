@@ -696,6 +696,26 @@ input[type="range"] {
   transition: stroke 0.16s ease, opacity 0.16s ease;
 }
 
+.flow-band {
+  opacity: 0.34;
+}
+
+/* The moving part of the current. The dash pattern slides along the path at a
+   fixed speed, so what a reader reads as "more evidence goes this way" is the
+   width of the band and not how fast anything travels. */
+.flow-current {
+  opacity: 0.95;
+  stroke-dasharray: 7 21;
+  stroke-linecap: round;
+  animation: current 1.4s linear infinite;
+}
+
+@keyframes current {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
 .flow-edge.idle path {
   stroke: var(--neutral-edge);
   opacity: 0.22;
@@ -897,4 +917,40 @@ input[type="range"] {
 
 .spring-row.route .spring-end {
   fill: var(--favors-left);
+}
+
+/* ---- Arriving ---------------------------------------------------------------
+
+   A lens change is a change of statement, so the canvas settles into place
+   rather than snapping. Anyone who has asked their system not to animate is
+   given the result directly, here and everywhere else on the page. */
+
+.stage.entering {
+  animation: settle 0.42s cubic-bezier(0.22, 0.68, 0.35, 1);
+}
+
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.inspector,
+.controls {
+  transition: opacity 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

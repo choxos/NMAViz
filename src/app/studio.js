@@ -296,6 +296,58 @@ function setAnimation(active) {
   }
 }
 
+/* Moving between arrangements.
+ *
+ * Switching from the precision arrangement to the circle rearranges every
+ * treatment at once, and a network that teleports is a network a reader has to
+ * re-read from scratch. Tweening the positions keeps identity: the eye follows
+ * each treatment to its new place and the comparison being studied is never
+ * lost. Anyone who has asked their system not to animate gets the jump instead.
+ */
+const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let shownPoints = null;
+let shownKey = null;
+let tween = null;
+let tweenFrame = null;
+
+function runTween() {
+  if (tweenFrame) return;
+  const step = () => {
+    tweenFrame = null;
+    if (!tween) return;
+    renderStage();
+    if (tween) tweenFrame = requestAnimationFrame(step);
+  };
+  tweenFrame = requestAnimationFrame(step);
+}
+
+function framedPoints(model, box) {
+  const built = layoutFor(model);
+  const target = frame(built.points, box);
+  const key = `${state.dataset?.id}|${state.model}|${state.layout}`;
+
+  if (shownKey !== key) {
+    if (shownKey !== null && shownPoints?.length === target.length && !reducedMotion()) {
+      tween = { from: shownPoints, to: target, start: performance.now() };
+      runTween();
+    }
+    shownKey = key;
+  }
+  shownPoints = target;
+
+  if (!tween) return { points: target, meta: built.meta };
+
+  const t = Math.min(1, (performance.now() - tween.start) / 460);
+  const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+  const moving = tween.to.map((point, i) => ({
+    x: tween.from[i].x + (point.x - tween.from[i].x) * eased,
+    y: tween.from[i].y + (point.y - tween.from[i].y) * eased,
+  }));
+  if (t >= 1) tween = null;
+  return { points: moving, meta: built.meta };
+}
+
 function layoutFor(model) {
   const key = `${state.dataset?.id}|${state.model}|${state.layout}`;
   if (cachedLayout.key !== key) {
@@ -319,7 +371,6 @@ function renderStage() {
   const height = stage.clientHeight || 800;
   stage.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
-  const built = layoutFor(model);
   // Keep the network clear of the panels that float over it, so a treatment
   // never sits underneath the inspector and its label never runs off the edge.
   const wide = width > 900;
@@ -329,7 +380,7 @@ function renderStage() {
     top: wide ? 150 : 92,
     bottom: wide ? height - 118 : height - 150,
   };
-  const points = frame(built.points, box);
+  const { points, meta } = framedPoints(model, box);
 
   const lens = LENSES.find((l) => l.id === state.lens) ?? LENSES[0];
   const context = {
@@ -338,7 +389,7 @@ function renderStage() {
     model,
     state,
     points,
-    layoutMeta: built.meta,
+    layoutMeta: meta,
     width,
     height,
     measure: state.dataset?.measure ?? "MD",
@@ -348,6 +399,17 @@ function renderStage() {
   setAnimation(Boolean(lens.animate));
   const drawn = lens.draw(context);
   stage.innerHTML = drawn.stage;
+  // A new lens is a new statement about the network, so it arrives rather than
+  // appearing. The class is set only when the lens actually changed, otherwise
+  // an animated lens would restart its entrance on every frame.
+  if (stage.dataset.lens !== lens.id) {
+    stage.dataset.lens = lens.id;
+    if (!reducedMotion()) {
+      stage.classList.remove("entering");
+      void stage.offsetWidth;
+      stage.classList.add("entering");
+    }
+  }
   inspector.innerHTML = drawn.inspector ?? "";
   document.querySelector("#lens-title").textContent = lens.name;
   document.querySelector("#lens-note").textContent = drawn.note ?? lens.tagline;
@@ -362,6 +424,9 @@ function renderStage() {
 
 function loadExample(id) {
   const example = examples.find((e) => e.id === id);
+  shownKey = null;
+  shownPoints = null;
+  tween = null;
   const c = example.contrasts;
   const rows = c.studlab.map((_, i) => ({
     studlab: String(c.studlab[i]),

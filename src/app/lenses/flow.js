@@ -116,12 +116,25 @@ export const flow = {
           x: b.x - ((b.x - a.x) / length) * radius,
           y: b.y - ((b.y - a.y) / length) * radius,
         };
+        // The current is drawn twice: a still band at the full width, and a
+        // dashed band sliding along it at a constant speed. Speed is the same
+        // everywhere on purpose, because in a conductor it is the cross section
+        // that carries the current, so here it is the width and only the width
+        // that means how much evidence travels this way.
+        const path = arc(a, tip);
         return `
           <g class="flow-edge${carrying ? "" : " idle"}${edge.isTarget ? " target" : ""}"
              data-edge="${escape(`${edge.comparison.treat1} ${edge.comparison.treat2}`)}">
             <title>${escape(edge.from)} to ${escape(edge.to)}: ${percent(edge.flow, 1)} of the estimate</title>
-            <path d="${arc(a, tip)}" stroke-width="${width.toFixed(2)}"
+            <path class="flow-band" d="${path}" stroke-width="${width.toFixed(2)}"
               ${carrying ? 'marker-end="url(#flow-arrow)"' : ""}/>
+            ${
+              carrying
+                ? `<path class="flow-current" d="${path}" stroke-width="${(width * 0.55).toFixed(
+                    2
+                  )}"/>`
+                : ""
+            }
           </g>`;
       })
       .join("");
