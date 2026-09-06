@@ -954,3 +954,32 @@ input[type="range"] {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ---- Inconsistency lens ---------------------------------------------------- */
+
+.hodge-edge path {
+  fill: none;
+  stroke-linecap: round;
+  transition: stroke 0.16s ease;
+}
+
+.hodge-edge.over path {
+  stroke: var(--favors-right);
+}
+
+.hodge-edge.under path {
+  stroke: var(--favors-left);
+}
+
+.hodge-edge {
+  cursor: pointer;
+}
+
+.hodge-edge:hover path {
+  stroke: var(--ink);
+}
+
+.hodge-plate {
+  fill: var(--accent);
+  stroke: none;
+}

@@ -10,5 +10,6 @@ import { flow } from "./flow.js";
 import { contributions } from "./contributions.js";
 import { diffusionLens } from "./diffusion.js";
 import { springs } from "./springs.js";
+import { hodgeLens } from "./hodge.js";
 
-export const LENSES = [network, flow, contributions, diffusionLens, springs];
+export const LENSES = [network, flow, contributions, diffusionLens, springs, hodgeLens];

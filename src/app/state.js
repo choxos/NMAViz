@@ -25,6 +25,9 @@ export const state = {
   hover: null,
   search: "",
   panel: null, // an open overlay panel: "data", "about"
+  // Settings that belong to one lens rather than to the whole studio. Lenses
+  // read their own keys and ignore the rest.
+  options: {},
   separation: 0, // 0 is the network, 1 is the exploded study inventory
 };
 

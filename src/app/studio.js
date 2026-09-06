@@ -474,6 +474,12 @@ function wire() {
     const layoutButton = event.target.closest("[data-layout]");
     if (layoutButton) return update({ layout: layoutButton.dataset.layout });
 
+    const option = event.target.closest("[data-option]");
+    if (option)
+      return update({
+        options: { ...state.options, [option.dataset.option]: option.dataset.value },
+      });
+
     const example = event.target.closest("[data-example]");
     if (example) return loadExample(example.dataset.example);
 

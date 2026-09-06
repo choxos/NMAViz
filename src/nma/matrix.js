@@ -151,3 +151,23 @@ export function eigenSymmetric(A, { sweeps = 60, tolerance = 1e-12 } = {}) {
     vectors: V.map((row) => order.map((i) => row[i])),
   };
 }
+
+/* Moore-Penrose pseudoinverse of any symmetric matrix, through its
+ * eigendecomposition. The Laplacian shortcut above needs the null space to be
+ * exactly the constant vector; this one makes no such assumption, which is what
+ * the Hodge projections need, since the null space there is whatever the
+ * network's loop structure happens to make it. */
+export function pseudoinverseSymmetric(A, { tolerance = 1e-10 } = {}) {
+  const { values, vectors } = eigenSymmetric(A);
+  const largest = Math.max(...values.map(Math.abs), 0);
+  const cutoff = largest * tolerance;
+  const n = A.length;
+  const out = zeros(n, n);
+  for (let k = 0; k < n; k++) {
+    if (Math.abs(values[k]) <= cutoff) continue;
+    const scale = 1 / values[k];
+    for (let i = 0; i < n; i++)
+      for (let j = 0; j < n; j++) out[i][j] += scale * vectors[i][k] * vectors[j][k];
+  }
+  return out;
+}
