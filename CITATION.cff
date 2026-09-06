@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+title: "NMAViz: reading the evidence structure of a network meta-analysis"
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - family-names: Sofi-Mahmudi
+    given-names: Ahmad
+    orcid: "https://orcid.org/0000-0001-6829-0823"
+repository-code: "https://github.com/choxos/NMAViz"
+url: "https://nmaviz.xera.ac"
+license: MIT
+abstract: >-
+  NMAViz fits the frequentist graph-theoretical network meta-analysis model in
+  the browser and draws the same fitted model through the readings the methods
+  literature has proposed for it: an arrangement whose distances are standard
+  errors, a bipartite treatment-trial graph, the flow of evidence for one
+  comparison, contribution matrices under two methods, a signed study-level
+  reconstruction of the estimate, a Hodge decomposition of inconsistency, a
+  diffusion, and a system of springs. The engine is checked against the R
+  package netmeta on six published networks.
+keywords:
+  - network meta-analysis
+  - evidence synthesis
+  - evidence flow
+  - hat matrix
+  - data visualization

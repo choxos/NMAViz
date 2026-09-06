@@ -11,6 +11,17 @@ inconsistency, as a diffusion, and as a system of springs.
 
 There is no backend and no upload. The file is parsed, analyzed and drawn on your own machine.
 
+**[Open it at nmaviz.xera.ac](https://nmaviz.xera.ac)**
+
+![The network arrangement, where the distance between two treatments is the standard error of comparing them](screenshots/network.png)
+
+|  |  |
+| --- | --- |
+| ![Evidence flow for one comparison, with the current animating along each arrow](screenshots/flow.png) | ![The reconstruction waterfall, walking to the network estimate one trial at a time](screenshots/reconstruction.png) |
+| Where one estimate comes from | What each trial did to it |
+| ![The Hodge split of inconsistency in the dark theme](screenshots/inconsistency-dark.png) | ![The springs lens in the dark theme](screenshots/springs-dark.png) |
+| Inconsistency triangles can see, and cannot | Studies in parallel, routes in series |
+
 ## What it does
 
 Most network meta-analysis software answers what the estimates are. This answers where they came

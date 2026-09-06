@@ -3,3 +3,4 @@ dist/
 .DS_Store
 .gstack/
 documentation/
+.design/*.html

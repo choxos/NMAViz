@@ -1,0 +1,18 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 900, "h": 1180 },
+    { "file": "SystemDark.dc.html", "x": 1000, "y": 0, "w": 900, "h": 1180 },
+    { "file": "Network.dc.html", "x": 0, "y": 1320, "w": 1280, "h": 720 },
+    { "file": "Flow.dc.html", "x": 1380, "y": 1320, "w": 1280, "h": 720 },
+    { "file": "Reconstruction.dc.html", "x": 0, "y": 2180, "w": 1280, "h": 720 },
+    { "file": "DataSheet.dc.html", "x": 1380, "y": 2180, "w": 1280, "h": 720 },
+    { "file": "Mobile.dc.html", "x": 0, "y": 3040, "w": 390, "h": 844 }
+  ],
+  "annotations": [
+    { "id": "system-note", "x": 0, "y": -150, "w": 520, "text": "The tokens are lifted from src/style.css, not approximated: warm paper stage, ink text, an indigo network and a copper accent for anything that flows. The diverging pair is separate so a flow color is never read as a direction of effect." },
+    { "id": "screens-note", "x": 0, "y": 1180, "w": 520, "text": "One shell in every lens: identity and caption top left, lens switcher top center, comparison of interest and model bottom left, inspector right, readouts bottom center. Switching lens changes the question, never the furniture." },
+    { "id": "flow-note", "x": 1380, "y": 1180, "w": 520, "text": "The current animates: a still band carries the width, a dashed band slides along it at a constant speed. Same speed everywhere on purpose, so width alone means how much evidence travels that way. It stops under prefers-reduced-motion." },
+    { "id": "mobile-note", "x": 470, "y": 3040, "w": 460, "text": "Narrow windows keep the comparison picker on screen, since every lens depends on it, and move the lens switcher to a strip at the foot where a thumb is. Targets are 44px. The network keeps the top of the screen to itself." }
+  ],
+  "launch": { "view": "canvas" }
+}
