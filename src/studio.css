@@ -821,3 +821,80 @@ input[type="range"] {
   color: var(--accent);
   font-weight: 600;
 }
+
+/* ---- Springs lens ---------------------------------------------------------- */
+
+.spring-axis line {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.spring-axis text {
+  font-size: 10px;
+  fill: var(--faint);
+  letter-spacing: 0.02em;
+}
+
+.spring-coil {
+  fill: none;
+  stroke: var(--neutral-edge);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.spring-interval {
+  stroke: var(--line);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.spring-end {
+  fill: var(--neutral-edge);
+}
+
+.spring-joint {
+  fill: var(--surface);
+  stroke: var(--neutral-edge);
+  stroke-width: 1.2;
+}
+
+.spring-label {
+  font-size: 10.5px;
+  fill: var(--muted);
+}
+
+.spring-row.pooled .spring-coil,
+.spring-row.pooled .spring-end {
+  stroke: var(--brand);
+  fill: var(--brand);
+}
+
+.spring-row.pooled .spring-coil {
+  fill: none;
+  stroke-width: 2;
+}
+
+.spring-row.pooled .spring-label,
+.spring-row.network .spring-label {
+  fill: var(--ink);
+  font-weight: 600;
+}
+
+.spring-row.network .spring-coil {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}
+
+.spring-row.network .spring-end {
+  fill: var(--accent);
+}
+
+.spring-row.route .spring-coil {
+  stroke: var(--favors-left);
+  opacity: 0.85;
+}
+
+.spring-row.route .spring-end {
+  fill: var(--favors-left);
+}
