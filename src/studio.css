@@ -802,3 +802,22 @@ input[type="range"] {
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
+
+/* ---- Diffusion lens -------------------------------------------------------- */
+
+.diffusion-edge {
+  fill: none;
+  stroke: var(--neutral-edge);
+  stroke-width: 1.2;
+  opacity: 0.3;
+}
+
+.diffusion-halo {
+  fill: var(--accent);
+  transition: r 0.09s linear, opacity 0.09s linear;
+}
+
+.study-table tr.current td {
+  color: var(--accent);
+  font-weight: 600;
+}

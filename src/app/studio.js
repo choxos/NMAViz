@@ -276,6 +276,26 @@ function aboutPanel() {
 
 let cachedLayout = { key: null, points: null, meta: null };
 
+/* Some lenses animate. They are driven from here rather than from inside the
+ * lens, so that only the canvas is redrawn on a frame and the panels around it
+ * are left alone. Twelve frames a second is enough for a process that is meant
+ * to be read step by step, and it keeps a large network responsive. */
+let frameCount = 0;
+let animationTimer = null;
+
+function setAnimation(active) {
+  if (active && !animationTimer) {
+    animationTimer = setInterval(() => {
+      frameCount += 1;
+      renderStage();
+    }, 85);
+  } else if (!active && animationTimer) {
+    clearInterval(animationTimer);
+    animationTimer = null;
+    frameCount = 0;
+  }
+}
+
 function layoutFor(model) {
   const key = `${state.dataset?.id}|${state.model}|${state.layout}`;
   if (cachedLayout.key !== key) {
@@ -313,6 +333,7 @@ function renderStage() {
 
   const lens = LENSES.find((l) => l.id === state.lens) ?? LENSES[0];
   const context = {
+    frame: frameCount,
     fit: state.fit,
     model,
     state,
@@ -324,6 +345,7 @@ function renderStage() {
     dataset: state.dataset,
   };
 
+  setAnimation(Boolean(lens.animate));
   const drawn = lens.draw(context);
   stage.innerHTML = drawn.stage;
   inspector.innerHTML = drawn.inspector ?? "";
