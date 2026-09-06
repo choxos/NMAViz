@@ -67,6 +67,9 @@ export function load(dataset, rows) {
       selection: null,
       separation: 0,
       pins: {},
+      // Machine settings belong to the network they were set on: a held walk
+      // step or a switched-off source means nothing on the next dataset.
+      options: {},
       panel: null,
     });
   } catch (error) {

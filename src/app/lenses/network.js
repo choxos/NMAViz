@@ -276,16 +276,23 @@ function circuit(context, geometry, emphasis) {
         <span class="lamp${powered && state.contrast ? " lit" : ""}"></span>
       </div>
       <div class="console-group">
-        <span class="console-label">Reading</span>
+        <span class="console-label">Potential across</span>
         <span class="deck-reading">${
           state.contrast && powered
-            ? `${number(model.TE[model.index.get(state.contrast.treat1)][
-                model.index.get(state.contrast.treat2)
-              ], 3)} V`
+            ? number(
+                model.TE[model.index.get(state.contrast.treat1)][
+                  model.index.get(state.contrast.treat2)
+                ],
+                3
+              )
             : "—"
         }</span>
-        <span class="console-label">across ${
-          state.contrast ? `${escape(state.contrast.treat1)}, ${escape(state.contrast.treat2)}` : "—"
+        <span class="console-label">${
+          state.contrast
+            ? `${escape(state.contrast.treat1)}, ${escape(state.contrast.treat2)}${
+                context.dataset?.unit ? `, ${escape(context.dataset.unit)}` : ""
+              }`
+            : "—"
         }</span>
       </div>`,
     note:

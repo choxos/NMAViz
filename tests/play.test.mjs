@@ -32,27 +32,35 @@ const rowsOf = (example) => {
   }));
 };
 
-const rigForEdge = (edge) =>
-  makeRig(edge.rows.map((row) => ({ k: 1 / row.seTE ** 2, y: row.TE })));
+/* Under random effects each study spring gains the heterogeneity spring in
+ * series, which is what makes the assembly rest where the random-effects model
+ * pools to rather than where the common-effect one does. */
+const rigForEdge = (edge, tau = 0) =>
+  makeRig(edge.rows.map((row) => ({ k: 1 / (row.seTE ** 2 + tau ** 2), y: row.TE })));
 
-test("the assembly rests exactly at the pooled estimate, on every network", () => {
+test("the assembly rests exactly at the pooled estimate, under both models", () => {
   let checked = 0;
   for (const example of examples) {
     const fit = fitNetwork(rowsOf(example));
-    for (const edge of fit.common.direct) {
-      if (edge.rows.length < 2) continue;
-      const rig = rigForEdge(edge);
-      // Not a tolerance chosen to pass: the equilibrium of springs whose
-      // stiffnesses are 1/se² IS the inverse-variance weighted mean, which is
-      // what the engine pools to.
-      assert.ok(
-        Math.abs(rig.equilibrium - edge.TE) < 1e-12,
-        `${example.id} ${edge.treat1} vs ${edge.treat2}: rests at ${rig.equilibrium}, pools to ${edge.TE}`
-      );
-      checked += 1;
+    for (const [which, model] of [
+      ["common", fit.common],
+      ["random", fit.random],
+    ]) {
+      for (const edge of model.direct) {
+        if (edge.rows.length < 2) continue;
+        const rig = rigForEdge(edge, model.tau ?? 0);
+        // Not a tolerance chosen to pass: the equilibrium of springs whose
+        // stiffnesses are 1/(se² + tau²) IS the weighted mean the engine pools
+        // to, so the toy cannot settle anywhere the panel does not report.
+        assert.ok(
+          Math.abs(rig.equilibrium - edge.TE) < 1e-12,
+          `${example.id} ${which} ${edge.treat1} vs ${edge.treat2}: rests at ${rig.equilibrium}, pools to ${edge.TE}`
+        );
+        checked += 1;
+      }
     }
   }
-  assert.ok(checked > 40, `only ${checked} bundles were available to check`);
+  assert.ok(checked > 80, `only ${checked} bundles were available to check`);
 });
 
 test("a pulled assembly gives back what was put into it and comes to rest", () => {
@@ -87,6 +95,8 @@ test("the energy the assembly holds at rest is half Cochran's Q", () => {
   let checked = 0;
   for (const example of examples) {
     const fit = fitNetwork(rowsOf(example));
+    // Stated for the common-effect assembly, which is the one Cochran's Q is
+    // computed on: under random effects the springs are softer and hold less.
     for (const edge of fit.common.direct) {
       if (edge.rows.length < 2) continue;
       const rig = rigForEdge(edge);

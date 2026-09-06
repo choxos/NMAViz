@@ -606,14 +606,23 @@ function renderStage() {
       stage.classList.add("entering");
     }
   }
-  inspector.innerHTML = drawn.inspector ?? "";
+  const reading = drawn.inspector ?? "";
+  if (inspector.dataset.markup !== reading) {
+    inspector.dataset.markup = reading;
+    inspector.innerHTML = reading;
+  }
 
   // The controls a lens offers for working its mechanism, rather than for
   // choosing what to look at. They sit on the deck under the canvas because
   // that is where the hands go.
   const deck = document.querySelector("#console");
   const controls = drawn.controls ?? "";
-  if (deck.dataset.markup !== controls) {
+  // A swinging assembly or a running walk redraws many times a second, and the
+  // deck's readings change every frame. Replacing its markup while a button is
+  // held would take that button out from under the pointer, so the press would
+  // land on one element and the release on its replacement, and no click would
+  // ever arrive. The rebuild waits until the hand is off.
+  if (deck.dataset.markup !== controls && !deckHeld) {
     deck.dataset.markup = controls;
     deck.innerHTML = controls;
   }
@@ -690,7 +699,16 @@ let rigLast = 0;
 
 /* The springs of the parallel bundle for the comparison being looked at: the
  * studies that compared these two treatments directly, each with its own effect
- * as a natural length and its own precision as a stiffness. */
+ * as a natural length and its own precision as a stiffness.
+ *
+ * Under random effects each study spring gains a second spring in series, of
+ * natural length zero and stiffness 1/tau², which is Papakonstantinou et al's
+ * heterogeneity spring. Springs in series add their compliances, so the pair
+ * behaves as one spring of stiffness 1/(se² + tau²), and the assembly then
+ * rests at the random-effects pooled estimate rather than the common-effect
+ * one. Without it the toy would settle in a place the panel beside it does not
+ * report, which would be a lie told with a nice animation.
+ */
 function rigFor(model, contrast) {
   if (!contrast) return null;
   const edge = model.direct.find(
@@ -701,8 +719,13 @@ function rigFor(model, contrast) {
   // One study is not an assembly: there is nothing to balance against.
   if (!edge || edge.rows.length < 2) return null;
   const sign = edge.treat1 === contrast.treat1 ? 1 : -1;
+  const tau2 = (model.tau ?? 0) ** 2;
   return makeRig(
-    edge.rows.map((row) => ({ k: 1 / row.seTE ** 2, y: sign * row.TE, label: row.studlab }))
+    edge.rows.map((row) => ({
+      k: 1 / (row.seTE ** 2 + tau2),
+      y: sign * row.TE,
+      label: row.studlab,
+    }))
   );
 }
 
@@ -760,6 +783,7 @@ function startPull(event) {
   const value = valueAtPointer(event);
   if (value == null) return false;
   pulling = event.pointerId;
+  document.querySelector("#stage").classList.add("pulling");
   rig.held = true;
   rig.running = false;
   rig.v = 0;
@@ -769,17 +793,25 @@ function startPull(event) {
   return true;
 }
 
+let pullFrame = null;
+
 function movePull(event) {
   if (pulling == null || event.pointerId !== pulling || !rig) return;
   const value = valueAtPointer(event);
   if (value == null) return;
   rig.x = value;
-  renderStage();
+  if (pullFrame) return;
+  pullFrame = requestAnimationFrame(() => {
+    pullFrame = null;
+    renderStage();
+    renderControls();
+  });
 }
 
 function endPull(event) {
   if (pulling == null || (event && event.pointerId !== pulling)) return;
   pulling = null;
+  document.querySelector("#stage").classList.remove("pulling");
   if (!rig) return;
   rig.held = false;
   rig.running = true;
@@ -859,6 +891,8 @@ function showTip(event) {
 
 let dragging = null;
 let dragFrame = null;
+/* True while a deck control is under a pressed pointer. */
+let deckHeld = false;
 
 /* Where a pointer is, as a fraction of the clear rectangle. */
 function boxFraction(event) {
@@ -1075,6 +1109,22 @@ function wire() {
   window.addEventListener("pointerup", (event) => {
     endPull(event);
     endDrag(event);
+  });
+
+  const deck = document.querySelector("#console");
+  deck.addEventListener("pointerdown", () => {
+    deckHeld = true;
+  });
+  addEventListener("pointerup", () => {
+    if (!deckHeld) return;
+    // The click a release produces is dispatched after this handler, so the
+    // deck stays frozen for one more turn of the loop. Thawing it here would
+    // replace the button between the release and the click, and the click
+    // would land on nothing.
+    setTimeout(() => {
+      deckHeld = false;
+      renderStage();
+    }, 0);
   });
 
   const drop = () => document.querySelector("#file-drop");
