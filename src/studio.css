@@ -686,3 +686,39 @@ input[type="range"] {
     display: none;
   }
 }
+
+/* ---- Flow lens ------------------------------------------------------------- */
+
+.flow-edge path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  transition: stroke 0.16s ease, opacity 0.16s ease;
+}
+
+.flow-edge.idle path {
+  stroke: var(--neutral-edge);
+  opacity: 0.22;
+}
+
+.flow-edge.target path {
+  stroke: var(--brand);
+}
+
+.flow-edge {
+  cursor: pointer;
+}
+
+.flow-edge:hover path {
+  stroke: var(--ink);
+}
+
+.route {
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.hop {
+  color: var(--faint);
+  padding: 0 1px;
+}

@@ -91,11 +91,16 @@ export function arc(a, b, bend = 0) {
   )} ${b.y.toFixed(1)}`;
 }
 
-/* The arrow marker every directed lens uses. */
+/* The arrow marker every directed lens uses.
+ *
+ * Marker units default to the stroke width, which would make the head of a
+ * thick arrow enormous; userSpaceOnUse keeps every head the same size, so the
+ * width of a line means the size of a flow and nothing else. */
 export const DEFS = `
   <defs>
-    <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7"
-      markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="context-stroke"/>
+    <marker id="flow-arrow" viewBox="0 0 10 10" refX="8.5" refY="5"
+      markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13"
+      orient="auto-start-reverse">
+      <path d="M0 0.6 L10 5 L0 9.4 z" fill="context-stroke"/>
     </marker>
   </defs>`;
