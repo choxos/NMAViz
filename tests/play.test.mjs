@@ -112,6 +112,38 @@ test("the energy the assembly holds at rest is half Cochran's Q", () => {
   assert.ok(checked > 40, `only ${checked} bundles were available to check`);
 });
 
+/* The same identity under random effects, which is a different number.
+ *
+ * The springs are softened by tau, so the assembly holds less than half the
+ * common-effect Q. The lens prints the energy beside the Q it is half of, so
+ * that Q has to be formed at the weights the springs actually have; printing
+ * the common-effect Q there would put two numbers side by side that are equal
+ * only when tau is zero.
+ */
+test("under random effects the assembly holds half the Q at its own weights", () => {
+  let softer = 0;
+  for (const example of examples) {
+    const fit = fitNetwork(rowsOf(example));
+    const tau = fit.random.tau ?? 0;
+    if (!(tau > 0)) continue;
+    for (const edge of fit.common.direct) {
+      if (edge.rows.length < 2) continue;
+      const rig = rigForEdge(edge, tau);
+      const Q = rig.springs.reduce(
+        (sum, spring) => sum + spring.k * (spring.y - rig.equilibrium) ** 2,
+        0
+      );
+      assert.ok(
+        Math.abs(rigEnergy(rig) - Q / 2) < 1e-9,
+        `${example.id} ${edge.treat1} vs ${edge.treat2}: holds ${rigEnergy(rig)}, not ${Q / 2}`
+      );
+      // And it is not the common-effect Q, which is what the deck used to show.
+      if (Math.abs(rigEnergy(rig) - edge.Q / 2) > 1e-6) softer += 1;
+    }
+  }
+  assert.ok(softer > 10, `only ${softer} bundles differed between the two models`);
+});
+
 test("an assembly cannot be built from a single study", () => {
   assert.equal(makeRig([]), null);
 });

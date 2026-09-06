@@ -174,6 +174,18 @@ export const springs = {
     const rig = context.rig;
     const pulled = rig && Math.abs(rig.x - rig.equilibrium) > 1e-12;
 
+    // The energy the assembly still holds once it has stopped moving is
+    // exactly half the Q formed with the stiffnesses the springs actually
+    // have. Under the common-effect model those are 1/se², so it is Cochran's
+    // Q; under random effects they are 1/(se² + tau²), so it is the same
+    // statistic at the random-effects weights and not the Q reported for the
+    // common-effect fit. Taking it from the rig keeps the number beside the
+    // energy equal to the energy under both models.
+    const restQ = rig
+      ? rig.springs.reduce((sum, spring) => sum + spring.k * (spring.y - rig.equilibrium) ** 2, 0)
+      : 0;
+    const cochran = context.state.model === "random" ? "the Q at these weights" : "Cochran's Q";
+
     // A wager. The reader places a stop where they think the bundle will come
     // to rest, before being told. While one is open the resting place is not
     // printed anywhere, because a prediction you can read off the panel beside
@@ -334,7 +346,7 @@ export const springs = {
                  ${escape(number(onScale(direct ? orient(direct, treat1) * direct.TE : 0, measure), 3))},
                  the pooled estimate, because that is the only place the studies' pulls cancel.
                  The energy the assembly still holds there,
-                 ${escape(number((direct.Q ?? 0) / 2, 2))}, is exactly half Cochran's Q for this
+                 ${escape(number(restQ / 2, 2))}, is exactly half ${cochran} for this
                  comparison: heterogeneity is the work it takes to hold springs of different
                  natural lengths at one common place.
                </p>`
@@ -391,10 +403,10 @@ export const springs = {
           <div class="console-group">
             <span class="console-label">Energy stored</span>
             <span class="deck-reading">${number(rigEnergy(rig), 2)}</span>
-            <span class="console-label">at rest, Q&#8202;/&#8202;2 =</span>
-            <span class="deck-reading">${
-              hidden ? "hidden" : number((direct?.Q ?? 0) / 2, 2)
+            <span class="console-label">at rest, ${
+              context.state.model === "random" ? "Q&#8202;at these weights&#8202;/&#8202;2 =" : "Q&#8202;/&#8202;2 ="
             }</span>
+            <span class="deck-reading">${hidden ? "hidden" : number(restQ / 2, 2)}</span>
           </div>`
         : `
           <div class="console-group">

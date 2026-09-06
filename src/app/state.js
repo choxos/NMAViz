@@ -52,8 +52,40 @@ export const subscribe = (listener) => {
   return () => listeners.delete(listener);
 };
 
+/* State that belongs to one comparison, and to the model it was placed under.
+ *
+ * A wager is a guess about where one comparison's springs come to rest, and a
+ * released walk is released somewhere inside the comparison it is drawn under.
+ * Neither means anything once what it was about has moved, and a wager that
+ * merely stops matching is worse than one that is cleared: the springs lens
+ * hides its numbers only while a matching wager is open, so a stale wager
+ * silently hands over the answer it was asking for.
+ *
+ * Doing this here rather than at each of the six places a comparison can
+ * change (the two menus, the swap, an edge, a node, a probe dropped on a
+ * treatment) is the only way to be sure none of them is missed.
+ */
+function invalidate(changes) {
+  if (changes.model && changes.model !== state.model) state.wager = null;
+  const next = changes.contrast;
+  if (!next || !state.contrast) return;
+  // The wager is placed on an axis that runs from one treatment to the other,
+  // so even reversing the comparison invalidates it.
+  if (next.treat1 !== state.contrast.treat1 || next.treat2 !== state.contrast.treat2)
+    state.wager = null;
+  // A walk survives as long as it is still released inside the comparison it
+  // is drawn under, which a swap does not change.
+  const origin = state.options.origin;
+  if (origin && origin !== next.treat1 && origin !== next.treat2) {
+    const options = { ...state.options };
+    delete options.origin;
+    state.options = options;
+  }
+}
+
 let scheduled = false;
 export function update(changes = {}) {
+  invalidate(changes);
   Object.assign(state, changes);
   if (scheduled) return;
   scheduled = true;
