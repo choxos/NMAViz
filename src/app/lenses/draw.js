@@ -31,8 +31,8 @@ export function nodeRadii(model) {
 }
 
 /* A label placed outside its node, pushed away from the middle of the canvas so
- * that it does not land on top of the network. */
-function labelFor(name, point, radius, width, height) {
+ * that it does not land on top of the network, with the box it will occupy. */
+function labelBox(label, point, radius, width, height) {
   const dx = point.x - width / 2;
   const dy = point.y - height / 2;
   const length = Math.hypot(dx, dy) || 1;
@@ -41,13 +41,66 @@ function labelFor(name, point, radius, width, height) {
   const y = point.y + (dy / length) * offset;
   const anchor = dx > 12 ? "start" : dx < -12 ? "end" : "middle";
   const baseline = dy > 12 ? "hanging" : dy < -12 ? "auto" : "middle";
-  return `<text class="node-label" x="${x.toFixed(1)}" y="${y.toFixed(1)}"
-    text-anchor="${anchor}" dominant-baseline="${baseline}">${escape(shortLabel(name))}</text>`;
+  // Inter at 11px runs to about 6.1 pixels a character, which is close enough
+  // to reserve space with.
+  const w = label.length * 6.1 + 6;
+  const h = 15;
+  const cx = anchor === "start" ? x + w / 2 : anchor === "end" ? x - w / 2 : x;
+  const cy = baseline === "hanging" ? y + h / 2 : baseline === "auto" ? y - h / 2 : y;
+  return {
+    cx,
+    cy,
+    w,
+    h,
+    markup: `<text class="node-label" x="${x.toFixed(1)}" y="${y.toFixed(1)}"
+      text-anchor="${anchor}" dominant-baseline="${baseline}">${escape(label)}</text>`,
+  };
+}
+
+/* Labels, placed where they fit.
+ *
+ * On a network of twenty treatments there is not room for twenty labels, and
+ * printing them all produces a pile of overlapping words that names nothing.
+ * Labels are placed in order of importance, the comparison being studied first
+ * and then the treatments carrying the most evidence, and one that would land
+ * on a label already placed is left out. Every treatment keeps its tooltip, so
+ * nothing becomes unreachable, only unprinted.
+ */
+function placeLabels(context, sizes, emphasis) {
+  const { model, points, width, height, state } = context;
+  const counts = nodeWeights(model);
+  const order = model.treatments
+    .map((name, i) => ({ name, i }))
+    .sort((a, b) => {
+      const rank = (x) =>
+        (emphasis.get(x.name) ? 2 : 0) +
+        (state.selection?.id === x.name ? 1 : 0);
+      return rank(b) - rank(a) || counts[b.i] - counts[a.i];
+    });
+
+  const boxes = [];
+  const placed = new Map();
+  for (const { name, i } of order) {
+    const label = shortLabel(name);
+    const geometry = labelBox(label, points[i], sizes[i], width, height);
+    const clashes = boxes.some(
+      (b) =>
+        Math.abs(b.cx - geometry.cx) * 2 < b.w + geometry.w &&
+        Math.abs(b.cy - geometry.cy) * 2 < b.h + geometry.h
+    );
+    // A treatment in the comparison being studied is always named, even if it
+    // has to sit close to another label.
+    if (clashes && !emphasis.get(name) && state.selection?.id !== name) continue;
+    boxes.push(geometry);
+    placed.set(i, geometry.markup);
+  }
+  return placed;
 }
 
 export function drawNodes(context, { emphasis = new Map(), radii } = {}) {
-  const { model, points, width, height, state } = context;
+  const { model, points, state } = context;
   const sizes = radii ?? nodeRadii(model);
+  const labels = placeLabels(context, sizes, emphasis);
   return model.treatments
     .map((name, i) => {
       const point = points[i];
@@ -57,7 +110,7 @@ export function drawNodes(context, { emphasis = new Map(), radii } = {}) {
         <g class="node ${role}${selected ? " selected" : ""}" data-treatment="${escape(name)}">
           <title>${escape(name)}</title>
           <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="${sizes[i].toFixed(1)}"/>
-          ${labelFor(name, point, sizes[i], width, height)}
+          ${labels.get(i) ?? ""}
         </g>`;
     })
     .join("");

@@ -110,7 +110,18 @@ function inspector(context) {
         <dt>Direct evidence</dt>
         <dd>${direct ? percent(direct.proportion, 1) : "0%"} of the network estimate</dd>
       </div>
+      <div>
+        <dt>Effective resistance</dt>
+        <dd>${number(model.resistance[i][j], 4)}</dd>
+      </div>
     </dl>
+
+    <p class="inspector-note">
+      Read the network as a circuit and the variance of a comparison is the effective resistance
+      between its two treatments, with each study a conductance of one over its variance. That is
+      why the distance between two treatments in this drawing is the standard error of comparing
+      them: the two are the same quantity.
+    </p>
 
     ${
       direct

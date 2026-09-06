@@ -8,8 +8,9 @@
  * about the current selection (right).
  */
 
-import { LAYOUTS, frame } from "./layout.js";
+import { LAYOUTS, frame, relieveOverlap, stressOf } from "./layout.js";
 import { LENSES } from "./lenses/index.js";
+import { nodeRadii } from "./lenses/draw.js";
 import { activeModel, load, state, subscribe, update } from "./state.js";
 import { ICONS, escape, number, percent, shortLabel } from "./ui.js";
 import examples from "../data/examples.json";
@@ -375,12 +376,21 @@ function renderStage() {
   // never sits underneath the inspector and its label never runs off the edge.
   const wide = width > 900;
   const box = {
-    left: wide ? 330 : 24,
-    right: wide ? width - 372 : width - 24,
-    top: wide ? 150 : 92,
-    bottom: wide ? height - 118 : height - 150,
+    left: wide ? 330 : 20,
+    right: wide ? width - 372 : width - 20,
+    top: wide ? 150 : 96,
+    // On a narrow window every panel is stacked along the bottom, so the
+    // network keeps the top of the screen to itself.
+    bottom: wide ? height - 118 : Math.max(200, height * 0.36),
   };
-  const { points, meta } = framedPoints(model, box);
+  const framed = framedPoints(model, box);
+  // Separate any treatments whose circles would sit on top of each other, then
+  // measure how much that cost, so the caption describes this drawing.
+  const points = relieveOverlap(framed.points, nodeRadii(model));
+  const meta =
+    framed.meta.stress == null
+      ? framed.meta
+      : { ...framed.meta, stress: stressOf(points, model.resistance) };
 
   const lens = LENSES.find((l) => l.id === state.lens) ?? LENSES[0];
   const context = {

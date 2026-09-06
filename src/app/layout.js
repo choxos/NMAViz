@@ -194,6 +194,74 @@ export const LAYOUTS = {
   circle: { label: "Circle", build: circleLayout },
 };
 
+/* Nudge overlapping treatments apart.
+ *
+ * A drawing where two circles sit on top of each other hides one of them, and a
+ * dense network produces several such pairs. The relief is deliberately weak:
+ * it only separates circles that actually overlap, and it moves both ends of a
+ * pair equally, so the arrangement's shape survives. What it does cost is
+ * fidelity, so the caller measures the stress again afterwards and reports the
+ * number that describes the picture on the screen rather than the one before
+ * the nudge.
+ */
+export function relieveOverlap(points, radii, { padding = 7, rounds = 60 } = {}) {
+  const moved = points.map((p) => ({ ...p }));
+  for (let round = 0; round < rounds; round++) {
+    let worst = 0;
+    for (let i = 0; i < moved.length - 1; i++)
+      for (let j = i + 1; j < moved.length; j++) {
+        const wanted = radii[i] + radii[j] + padding;
+        let dx = moved[j].x - moved[i].x;
+        let dy = moved[j].y - moved[i].y;
+        let distance = Math.hypot(dx, dy);
+        if (distance >= wanted) continue;
+        if (distance < 1e-6) {
+          // Exactly coincident: push along a fixed direction so the result is
+          // the same on every render.
+          dx = Math.cos(i * 2.39996);
+          dy = Math.sin(i * 2.39996);
+          distance = 1;
+        }
+        const push = ((wanted - distance) / distance / 2) * 0.6;
+        worst = Math.max(worst, wanted - distance);
+        moved[i].x -= dx * push;
+        moved[i].y -= dy * push;
+        moved[j].x += dx * push;
+        moved[j].y += dy * push;
+      }
+    if (worst < 0.25) break;
+  }
+  return moved;
+}
+
+/* Kruskal stress of a drawing against the standard errors it claims to show,
+ * measured in the pixels actually on the screen. */
+export function stressOf(points, resistance) {
+  const n = points.length;
+  let cross = 0;
+  let square = 0;
+  for (let i = 0; i < n - 1; i++)
+    for (let j = i + 1; j < n; j++) {
+      const target = Math.sqrt(Math.max(0, resistance[i][j]));
+      const drawn = Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
+      cross += target * drawn;
+      square += target * target;
+    }
+  // The best scale is fitted rather than assumed, since a drawing is only ever
+  // claimed to show distances up to one common factor.
+  const scale = square > 0 ? cross / square : 0;
+  let residual = 0;
+  let total = 0;
+  for (let i = 0; i < n - 1; i++)
+    for (let j = i + 1; j < n; j++) {
+      const target = scale * Math.sqrt(Math.max(0, resistance[i][j]));
+      const drawn = Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y);
+      residual += (target - drawn) ** 2;
+      total += drawn ** 2;
+    }
+  return total > 0 ? Math.sqrt(residual / total) : 0;
+}
+
 /* Fit a set of positions into a box, keeping the aspect ratio so that a
  * distance-carrying arrangement stays a distance-carrying arrangement. The box
  * is the part of the window the floating panels leave clear. */
