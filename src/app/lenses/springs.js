@@ -174,6 +174,23 @@ export const springs = {
     const rig = context.rig;
     const pulled = rig && Math.abs(rig.x - rig.equilibrium) > 1e-12;
 
+    // A wager. The reader places a stop where they think the bundle will come
+    // to rest, before being told. While one is open the resting place is not
+    // printed anywhere, because a prediction you can read off the panel beside
+    // you is not a prediction.
+    //
+    // Nothing is scored for making Q smaller or an interval narrower. The only
+    // thing measured is how close a guess was to a number the model had already
+    // computed, and the error is reported in the pooled standard errors of this
+    // comparison so that it means the same thing on a log odds ratio and on a
+    // difference in millilitres.
+    const wager =
+      rig && context.state.wager?.contrast === `${treat1}\u0000${treat2}` &&
+      context.state.wager.model === context.state.model
+        ? context.state.wager
+        : null;
+    const hidden = Boolean(wager && !wager.settled);
+
     const drawn = rows
       .map((row, index) => {
         const y = top + index * gap;
@@ -213,7 +230,11 @@ export const springs = {
           <g class="spring-row ${row.kind}${held && pulled ? " strained" : ""}${
             grabbable ? " grabbable" : ""
           }"${grabbable ? ' data-bob="pooled"' : ""}>
-            <title>${escape(row.label)}: ${effect(row.TE, row.seTE, measure)}</title>
+            <title>${escape(row.label)}${
+              hidden && (row.kind === "pooled" || row.kind === "network")
+                ? ""
+                : `: ${effect(row.TE, row.seTE, measure)}`
+            }</title>
             ${held ? "" : `<line class="spring-interval" x1="${lower}" y1="${y}" x2="${upper}" y2="${y}"/>`}
             ${body}
             ${
@@ -227,6 +248,28 @@ export const springs = {
           </g>`;
       })
       .join("");
+
+    // The stop the reader places, and the truth once it is revealed.
+    const stopMark = wager
+      ? `
+        <g class="wager${wager.settled ? " settled" : ""}">
+          <line class="wager-stop" data-prop="wager" x1="${at(wager.guess).toFixed(1)}" y1="${
+            top - 46
+          }" x2="${at(wager.guess).toFixed(1)}" y2="${top + rows.length * gap + 16}"/>
+          <text class="wager-label" x="${at(wager.guess).toFixed(1)}" y="${top - 54}"
+            text-anchor="middle">${wager.settled ? "you said" : "your guess"}</text>
+          ${
+            wager.settled
+              ? `<line class="wager-truth" x1="${at(rig.equilibrium).toFixed(1)}" y1="${
+                  top - 46
+                }" x2="${at(rig.equilibrium).toFixed(1)}" y2="${top + rows.length * gap + 16}"/>
+                 <text class="wager-label truth" x="${at(rig.equilibrium).toFixed(1)}" y="${
+                   top + rows.length * gap + 30
+                 }" text-anchor="middle">it rests here</text>`
+              : ""
+          }
+        </g>`
+      : "";
 
     // The bar the parallel springs all pull on, drawn only when there is one.
     const bundleRows = rows
@@ -250,18 +293,28 @@ export const springs = {
         <div>
           <dt>Direct, in parallel</dt>
           <dd>${
-            direct
-              ? effect(orient(direct, treat1) * direct.TE, direct.seTE, measure)
-              : "no direct comparison"
+            hidden
+              ? "hidden while you guess"
+              : direct
+                ? effect(orient(direct, treat1) * direct.TE, direct.seTE, measure)
+                : "no direct comparison"
           }</dd>
         </div>
         <div>
           <dt>Stiffest route</dt>
-          <dd>${routes[0] ? effect(routes[0].TE, routes[0].seTE, measure) : "–"}</dd>
+          <dd>${
+            hidden
+              ? "hidden while you guess"
+              : routes[0]
+                ? effect(routes[0].TE, routes[0].seTE, measure)
+                : "–"
+          }</dd>
         </div>
         <div>
           <dt>The whole assembly</dt>
-          <dd>${effect(model.TE[a][b], model.seTE[a][b], measure)}</dd>
+          <dd>${
+            hidden ? "hidden while you guess" : effect(model.TE[a][b], model.seTE[a][b], measure)
+          }</dd>
         </div>
       </dl>
 
@@ -275,7 +328,7 @@ export const springs = {
           why an indirect route is longer, weaker, and wider than any comparison in it.
         </p>
         ${
-          direct && direct.rows.length > 1
+          direct && direct.rows.length > 1 && !hidden
             ? `<p class="inspector-note">
                  Pull the parallel bundle along the axis and let it go. It comes back to
                  ${escape(number(onScale(direct ? orient(direct, treat1) * direct.TE : 0, measure), 3))},
@@ -297,7 +350,7 @@ export const springs = {
     `;
 
     return {
-      stage: `${axis}<g class="springs" data-middle="${middle}" data-scale="${scale}">${yoke}${drawn}</g>`,
+      stage: `${axis}<g class="springs" data-middle="${middle}" data-scale="${scale}">${yoke}${drawn}${stopMark}</g>`,
       inspector,
       controls: rig
         ? `
@@ -307,16 +360,41 @@ export const springs = {
             <button type="button" class="deck-button" data-play="settle">Let it rest</button>
           </div>
           <div class="console-group">
+            <span class="console-label">Wager</span>
+            ${
+              !wager
+                ? `<button type="button" class="deck-button" data-wager="open">Guess where it rests</button>`
+                : !wager.settled
+                  ? `<span class="deck-reading">${number(
+                      onScale(wager.guess, measure),
+                      3
+                    )}</span><button type="button" class="deck-button primary" data-wager="settle">Let go and find out</button>`
+                  : `<span class="deck-reading">out by ${number(
+                      Math.abs(wager.guess - rig.equilibrium) / (direct?.seTE || 1),
+                      2
+                    )}</span><span class="console-label">pooled standard errors</span>
+                     <button type="button" class="deck-button" data-wager="clear">Again</button>`
+            }
+          </div>
+          <div class="console-group">
             <span class="console-label">Held at</span>
-            <span class="deck-reading">${number(onScale(rig.x, measure), 3)}</span>
+            <span class="deck-reading">${
+              // The assembly starts at rest, so where it is being held IS the
+              // answer until it has been moved.
+              hidden ? "hidden" : number(onScale(rig.x, measure), 3)
+            }</span>
             <span class="console-label">Rests at</span>
-            <span class="deck-reading">${number(onScale(rig.equilibrium, measure), 3)}</span>
+            <span class="deck-reading">${
+              hidden ? "hidden" : number(onScale(rig.equilibrium, measure), 3)
+            }</span>
           </div>
           <div class="console-group">
             <span class="console-label">Energy stored</span>
             <span class="deck-reading">${number(rigEnergy(rig), 2)}</span>
             <span class="console-label">at rest, Q&#8202;/&#8202;2 =</span>
-            <span class="deck-reading">${number((direct?.Q ?? 0) / 2, 2)}</span>
+            <span class="deck-reading">${
+              hidden ? "hidden" : number((direct?.Q ?? 0) / 2, 2)
+            }</span>
           </div>`
         : `
           <div class="console-group">
@@ -328,12 +406,14 @@ export const springs = {
                 : "no direct comparison, so there is no bundle to pull"
             }</span>
           </div>`,
-      note: rig
-        ? `Drag the bundle's weight along the axis and let go. It settles at ${number(
-            onScale(rig.equilibrium, measure),
-            3
-          )}, the inverse-variance weighted mean, because that is the one place where the studies' pulls cancel. A precise study is a stiff spring and pulls harder.`
-        : `Each coil is a spring: its length is an effect, its stiffness is a precision. Parallel is pooling, series is an indirect route.`,
+      note: !rig
+        ? `Each coil is a spring: its length is an effect, its stiffness is a precision. Parallel is pooling, series is an indirect route.`
+        : hidden
+          ? `Put your stop where you think the bundle will come to rest, then let it go. A precise study is a stiff spring and pulls harder, so the assembly settles nearest the studies with the least uncertainty. Every number that would give the answer away is covered until you have committed.`
+          : `Drag the bundle's weight along the axis and let go. It settles at ${number(
+              onScale(rig.equilibrium, measure),
+              3
+            )}, the inverse-variance weighted mean, because that is the one place where the studies' pulls cancel. A precise study is a stiff spring and pulls harder.`,
     };
   },
 };

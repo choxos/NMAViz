@@ -22,6 +22,7 @@
 import { diffusionMass, diffusionPartials, varianceFrom } from "../../nma/diffusion.js";
 import { effect, escape, number, onScale, percent } from "../ui.js";
 import { arc, contrastEmphasis, drawNodes, hit, nodeRadii, scaleBetween } from "./draw.js";
+import { dropperMarkup } from "./props.js";
 
 const STEPS = 22;
 
@@ -29,14 +30,30 @@ const STEPS = 22;
 // nothing in it changes while the data and the model do not.
 let cache = { key: null, partials: null, mass: null };
 
+/* Where the walk is released.
+ *
+ * The capsule chooses this, and it is a real initial condition rather than a
+ * setting: the mass that spreads is the mass released at that treatment, and
+ * the picture is of that walk and no other. It defaults to the first treatment
+ * of the comparison because that is the walk the variance series below is
+ * built from, and when the reader moves it somewhere else the drawing says so
+ * rather than quietly showing one walk under another walk's caption.
+ */
+export function originOf(state, model) {
+  const chosen = state.options.origin;
+  if (chosen && model.index.get(chosen) != null) return chosen;
+  return state.contrast?.treat1;
+}
+
 function series(context) {
   const { model, state, dataset } = context;
-  const key = `${dataset?.id}|${state.model}|${state.contrast?.treat1}`;
+  const origin = originOf(state, model);
+  const key = `${dataset?.id}|${state.model}|${state.contrast?.treat1}|${origin}`;
   if (cache.key !== key) {
     cache = {
       key,
       partials: diffusionPartials(model, STEPS),
-      mass: diffusionMass(model, state.contrast.treat1, STEPS),
+      mass: diffusionMass(model, origin, STEPS),
     };
   }
   return cache;
@@ -120,7 +137,6 @@ export const diffusionLens = {
     "Ruecker G, Davies AL, Schwarzer G. Network meta-analysis and diffusion. Res Synth Methods. 2026.",
   mark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="12" r="6" opacity="0.6"/><circle cx="12" cy="12" r="9.6" opacity="0.3"/></svg>',
   animate: true,
-
   deck: true,
 
   draw(context) {
@@ -164,11 +180,40 @@ export const diffusionLens = {
       })
       .join("");
 
+    const origin = originOf(state, model);
+    const originPoint =
+      context.carrying?.kind === "dropper" && context.carrying.at
+        ? {
+            x: context.box.left + context.carrying.at.u * (context.box.right - context.box.left),
+            y: context.box.top + context.carrying.at.v * (context.box.bottom - context.box.top),
+          }
+        : points[model.index.get(origin)];
+    const calling =
+      context.carrying?.kind === "dropper" && context.carrying.candidate
+        ? `<text class="probe-call" x="${(originPoint.x + 18).toFixed(1)}" y="${(
+            originPoint.y - 46
+          ).toFixed(1)}">${escape(context.carrying.candidate)}</text>`
+        : "";
+
     return {
       stage: `<g class="diffusion-edges">${edges}</g><g class="diffusion-halos">${halo}</g>
-        <g class="nodes">${drawNodes(context, { emphasis: contrastEmphasis(state), radii })}</g>`,
+        <g class="nodes">${drawNodes(context, {
+          emphasis: contrastEmphasis(state),
+          radii,
+        })}</g>${dropperMarkup(originPoint, step === 0)}${calling}`,
       inspector: inspector(context, step, partials),
       controls: `
+        <div class="console-group">
+          <span class="console-label">Released at</span>
+          <span class="deck-reading">${escape(origin)}</span>
+          ${
+            origin === state.contrast.treat1
+              ? ""
+              : `<button type="button" class="deck-button" data-option="origin" data-value="auto">Back to ${escape(
+                  state.contrast.treat1
+                )}</button>`
+          }
+        </div>
         <div class="console-group">
           <span class="console-label">Walk</span>
           <button type="button" class="deck-button" data-option="walk" data-value="${Math.max(
@@ -189,14 +234,25 @@ export const diffusionLens = {
           <span class="console-label">Step</span>
           <span class="deck-reading">${step} of ${STEPS}</span>
           <span class="console-label">Variance explained</span>
-          <span class="deck-reading">${percent(
-            partials[step] / (partials[partials.length - 1] || 1),
-            1
-          )}</span>
+          <span class="deck-reading">${(() => {
+            const a = model.index.get(state.contrast.treat1);
+            const b = model.index.get(state.contrast.treat2);
+            const exact = model.seTE[a][b] ** 2;
+            return percent(
+              Math.min(1, varianceFrom(partials[step], a, b) / Math.max(exact, 1e-12)),
+              1
+            );
+          })()}</span>
         </div>`,
-      note: `A walker released at ${escape(state.contrast.treat1)}, ${step} ${
+      note: `A walker released at ${escape(origin)}, ${step} ${
         step === 1 ? "step" : "steps"
-      } in. Half the mass stays behind at each step, which is what makes the series converge on a network with no loop of odd length.`,
+      } in.${
+        origin === state.contrast.treat1
+          ? ""
+          : ` The variance series below is the one for a walk from ${escape(
+              state.contrast.treat1
+            )}, so it is the comparison of interest that it explains, not this walk.`
+      } Half the mass stays behind at each step, which is what makes the series converge on a network with no loop of odd length.`,
     };
   },
 };

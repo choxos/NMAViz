@@ -41,6 +41,10 @@ export const state = {
   // shown beside the sensitivity one, never replaced by it.
   excluded: [], // study labels
   sensitivity: null, // { fit, error } | null
+  // A prediction the reader has placed and not yet tested. Kept apart from
+  // everything else on purpose: it is a wager about the arithmetic, and it must
+  // never be able to change the arithmetic.
+  wager: null, // { contrast, model, guess, settled } | null
 };
 
 export const subscribe = (listener) => {
@@ -79,6 +83,7 @@ export function load(dataset, rows) {
       plug: null,
       excluded: [],
       sensitivity: null,
+      wager: null,
       // Machine settings belong to the network they were set on: a held walk
       // step or a switched-off source means nothing on the next dataset.
       options: {},
@@ -94,6 +99,7 @@ export function load(dataset, rows) {
       plug: null,
       excluded: [],
       sensitivity: null,
+      wager: null,
       panel: "data",
     });
   }

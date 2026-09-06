@@ -535,9 +535,14 @@ function renderStage() {
     top: wide ? 150 : 96,
     // On a narrow window every panel is stacked along the bottom, so the
     // network keeps the top of the screen to itself. A lens with a deck needs
-    // another band cleared for it.
+    // another band cleared for it, measured from the deck that is actually on
+    // screen rather than guessed: a deck that has wrapped to three rows needs
+    // more room than one that has not.
     bottom: wide
-      ? height - (LENSES.find((l) => l.id === state.lens)?.deck ? 202 : 118)
+      ? height -
+        (LENSES.find((l) => l.id === state.lens)?.deck
+          ? 118 + (document.querySelector("#console")?.offsetHeight || 46) + 26
+          : 118)
       : Math.max(200, height * 0.36),
   };
   const framed = framedPoints(model, box);
@@ -950,6 +955,39 @@ function valueAtPointer(event) {
   return (x - middle) / scale;
 }
 
+let movingStop = null;
+
+function startStop(event) {
+  if (!state.wager || state.wager.settled) return false;
+  if (!event.target.closest?.('[data-prop="wager"]')) return false;
+  const value = valueAtPointer(event);
+  if (value == null) return false;
+  movingStop = event.pointerId;
+  state.wager = { ...state.wager, guess: value };
+  hideTip();
+  renderStage();
+  return true;
+}
+
+function moveStop(event) {
+  if (movingStop == null || event.pointerId !== movingStop) return;
+  const value = valueAtPointer(event);
+  if (value == null) return;
+  state.wager = { ...state.wager, guess: value };
+  if (pullFrame) return;
+  pullFrame = requestAnimationFrame(() => {
+    pullFrame = null;
+    renderStage();
+    renderControls();
+  });
+}
+
+function endStop(event) {
+  if (movingStop == null || (event && event.pointerId !== movingStop)) return;
+  movingStop = null;
+  update({});
+}
+
 function startPull(event) {
   if (!rig) return false;
   if (!event.target.closest?.("[data-bob]")) return false;
@@ -1221,6 +1259,28 @@ function wire() {
 
     if (event.target.closest("#reset-arrangement")) return update({ pins: {} });
 
+    const wagerButton = event.target.closest("[data-wager]");
+    if (wagerButton && rig && state.contrast) {
+      const key = `${state.contrast.treat1}\u0000${state.contrast.treat2}`;
+      if (wagerButton.dataset.wager === "open")
+        // The guess starts where the reader would have to move it from, well
+        // clear of the answer, so that leaving it untouched is not a guess.
+        return update({
+          wager: {
+            contrast: key,
+            model: state.model,
+            guess: rig.equilibrium + rig.span * 0.8,
+            settled: false,
+          },
+        });
+      if (wagerButton.dataset.wager === "clear") return update({ wager: null });
+      // Letting go tests the guess: the assembly is pulled to it and released,
+      // and where it stops is the answer.
+      releaseFrom(rig, state.wager.guess);
+      runRig();
+      return update({ wager: { ...state.wager, settled: true } });
+    }
+
     const play = event.target.closest("[data-play]");
     if (play && rig) {
       if (play.dataset.play === "pull") {
@@ -1288,16 +1348,19 @@ function wire() {
   // A press picks up whichever thing it landed on, in order of specificity: a
   // prop first, then the springs bundle, then the treatment underneath.
   stage.addEventListener("pointerdown", (event) => {
+    if (startStop(event)) return;
     if (startProp(event)) return;
     if (startPull(event)) return;
     startDrag(event);
   });
   stage.addEventListener("pointermove", (event) => {
+    moveStop(event);
     moveProp(event);
     movePull(event);
     moveDrag(event);
   });
   const release = (event) => {
+    endStop(event);
     endProp(event);
     endPull(event);
     endDrag(event);
@@ -1306,6 +1369,7 @@ function wire() {
   stage.addEventListener("pointercancel", release);
   // A pointer released outside the canvas still ends the drag.
   window.addEventListener("pointerup", (event) => {
+    endStop(event);
     endProp(event);
     endPull(event);
     endDrag(event);

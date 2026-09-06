@@ -604,6 +604,37 @@ input[type="range"] {
   cursor: grabbing;
 }
 
+/* The wager: a stop the reader places, and the answer once it is revealed. */
+.wager-stop {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+  stroke-dasharray: 7 5;
+  cursor: grab;
+}
+
+.wager.settled .wager-stop {
+  stroke-dasharray: none;
+  opacity: 0.6;
+  cursor: default;
+}
+
+.wager-truth {
+  stroke: var(--brand);
+  stroke-width: 2.4;
+}
+
+.wager-label {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--accent);
+}
+
+.wager-label.truth {
+  fill: var(--brand);
+}
+
 /* A stretched assembly is under load, and says so. */
 .spring-row.strained .spring-coil {
   stroke: var(--accent);
