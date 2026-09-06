@@ -356,6 +356,230 @@ input[type="range"] {
 
 /* ---- Readouts -------------------------------------------------------------- */
 
+/* ---- Props ----------------------------------------------------------------- */
+
+/* A plug, a socket, and the cable between them. The state of the circuit is
+   readable from the picture without a word of text: pins in, current flows. */
+.plug,
+.dropper,
+.probe {
+  cursor: grab;
+}
+
+#stage.carrying .plug,
+#stage.carrying .dropper,
+#stage.carrying .probe {
+  cursor: grabbing;
+}
+
+.plug-body {
+  fill: var(--surface);
+  stroke: var(--brand);
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+
+.plug-pins line {
+  stroke: var(--brand);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+.socket-body {
+  fill: var(--stage);
+  stroke: var(--brand);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.socket-contacts line {
+  stroke: var(--brand);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  opacity: 0.5;
+}
+
+/* An empty socket is the one thing on this canvas allowed to look like it
+   wants something. */
+.socket.empty .socket-body {
+  stroke-dasharray: 3 3;
+}
+
+.socket.empty .socket-contacts line {
+  opacity: 1;
+  stroke: var(--accent);
+}
+
+.cable {
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+.source.off .cable {
+  stroke: var(--neutral-edge);
+  opacity: 0.5;
+}
+
+.source.off .plug-pins line {
+  stroke: var(--neutral-edge);
+}
+
+.source.off .plug-body {
+  stroke: var(--neutral-edge);
+}
+
+/* The probes: which two treatments the potential is measured across. */
+.probe-needle {
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.probe.from .probe-needle,
+.probe.from .probe-collar {
+  fill: var(--favors-right);
+  stroke: var(--favors-right);
+}
+
+.probe.to .probe-needle,
+.probe.to .probe-collar {
+  fill: var(--ink);
+  stroke: var(--ink);
+}
+
+.probe-lead {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.probe-lead.from {
+  stroke: var(--favors-right);
+}
+
+.probe-lead.to {
+  stroke: var(--ink-soft);
+}
+
+/* The meter the leads come out of, so they read as one instrument. */
+.meter-body {
+  fill: var(--surface);
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.meter-reading {
+  font-size: 15px;
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+  fill: var(--ink);
+}
+
+.meter-label {
+  font-size: 9px;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--faint);
+}
+
+.meter-jack.from {
+  fill: var(--favors-right);
+}
+
+.meter-jack.to {
+  fill: var(--ink-soft);
+}
+
+/* What a travelling probe would land on, named before it lands. */
+.probe-call {
+  font-size: 11.5px;
+  font-weight: 650;
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--stage);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+}
+
+/* The tray: where trials go when they are taken out of the analysis. It is
+   drawn as a place with an edge, not as a control, because dropping a trial in
+   it changes the evidence and nothing else on this site does. */
+.tray-body {
+  fill: var(--wash);
+  stroke: var(--line);
+  stroke-width: 1.2;
+  stroke-dasharray: 5 4;
+}
+
+.tray.open .tray-body {
+  stroke: var(--accent);
+  stroke-dasharray: none;
+  fill: var(--accent-soft);
+}
+
+.tray.loaded .tray-body {
+  stroke-dasharray: none;
+  stroke: var(--accent);
+}
+
+.tray-label {
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--faint);
+}
+
+.tray.loaded .tray-label {
+  fill: var(--accent);
+}
+
+.trial {
+  cursor: grab;
+}
+
+.trial.lifted rect {
+  opacity: 1;
+}
+
+.trial.shelved rect {
+  fill: var(--accent);
+  opacity: 0.75;
+}
+
+/* A sensitivity result is a different analysis, so it is marked as one. */
+.inspector-section.sensitivity {
+  border-left: 2px solid var(--accent);
+  padding-left: 11px;
+}
+
+.inspector-section.sensitivity.broken {
+  border-left-color: var(--favors-right);
+}
+
+/* The dropper: where a walk is released. */
+.dropper-body {
+  fill: var(--surface);
+  stroke: var(--brand);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.dropper-bulb {
+  fill: var(--brand);
+  stroke: var(--brand);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.dropper-drop {
+  fill: var(--accent);
+}
+
 /* ---- The springs rig ------------------------------------------------------- */
 
 /* The bar the parallel springs all pull on, and the fixed points they pull

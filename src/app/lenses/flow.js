@@ -11,6 +11,7 @@
 import { evidenceFlow, flowPaths } from "../../nma/flow.js";
 import { effect, escape, number, percent } from "../ui.js";
 import { DEFS, arc, contrastEmphasis, drawNodes, hit, nodeRadii, scaleBetween } from "./draw.js";
+import { leadPath, meterMarkup, probeMarkup } from "./props.js";
 
 function inspector(context, flow, paths) {
   const { model, measure, dataset } = context;
@@ -168,10 +169,91 @@ export const flow = {
       })
       .join("");
 
+    // The meter and its two probes.
+    //
+    // Which treatments the probes touch is which comparison is being measured,
+    // and that is not a display setting: it is the question the whole site is
+    // answering, shared by every lens. So the probes are the visible primary
+    // way to ask it, and the two menus in the panel are the same control for
+    // anyone not using a pointer.
+    const carried = context.carrying;
+    const airborne = (role) =>
+      carried?.kind === `probe-${role}` && carried.moved && carried.at
+        ? {
+            x: context.box.left + carried.at.u * (context.box.right - context.box.left),
+            y: context.box.top + carried.at.v * (context.box.bottom - context.box.top),
+          }
+        : null;
+
+    const from = airborne("from") ?? points[model.index.get(state.contrast.treat1)];
+    const to = airborne("to") ?? points[model.index.get(state.contrast.treat2)];
+    const meterAt = {
+      x: (context.box.left + context.box.right) / 2,
+      y: context.box.bottom - 6,
+    };
+    const jackFrom = { x: meterAt.x - 26, y: meterAt.y + 26 };
+    const jackTo = { x: meterAt.x + 26, y: meterAt.y + 26 };
+    const facing = (tip) => {
+      const dx = tip.x - jackFrom.x;
+      const dy = tip.y - (jackFrom.y + 40);
+      const len = Math.hypot(dx, dy) || 1;
+      return { x: -dx / len, y: -dy / len };
+    };
+    const radii = nodeRadii(model);
+    const touch = (tip, i, loose) =>
+      loose
+        ? tip
+        : {
+            x: tip.x - facing(tip).x * (radii[i] + 1),
+            y: tip.y - facing(tip).y * (radii[i] + 1),
+          };
+
+    // What a probe in the air would land on, said out loud before it lands.
+    const calling =
+      carried?.candidate && carried.kind?.startsWith("probe")
+        ? `<text class="probe-call" x="${(
+            (carried.kind === "probe-from" ? from : to).x + 16
+          ).toFixed(1)}" y="${((carried.kind === "probe-from" ? from : to).y - 16).toFixed(
+            1
+          )}">${escape(carried.candidate)}</text>`
+        : "";
+
+    const meter = `
+      <g class="meter-rig">
+        <path class="probe-lead from" d="${leadPath(jackFrom, from)}"/>
+        <path class="probe-lead to" d="${leadPath(jackTo, to)}"/>
+        ${meterMarkup(
+          meterAt,
+          escape(
+            effect(
+              model.TE[model.index.get(state.contrast.treat1)][
+                model.index.get(state.contrast.treat2)
+              ],
+              null,
+              context.measure
+            )
+          ),
+          escape(`${state.contrast.treat1} minus ${state.contrast.treat2}`)
+        )}
+        ${probeMarkup(
+          touch(from, model.index.get(state.contrast.treat1), Boolean(airborne("from"))),
+          facing(from),
+          "from",
+          state.contrast.treat1
+        )}
+        ${probeMarkup(
+          touch(to, model.index.get(state.contrast.treat2), Boolean(airborne("to"))),
+          facing(to),
+          "to",
+          state.contrast.treat2
+        )}
+        ${calling}
+      </g>`;
+
     return {
       stage: `${DEFS}<g class="flow-edges">${edges}</g><g class="nodes">${drawNodes(context, {
         emphasis: contrastEmphasis(state),
-      })}</g>`,
+      })}</g>${meter}`,
       inspector: inspector(context, flowNetwork, paths),
       note: `One unit of evidence enters at ${state.contrast.treat1} and leaves at ${state.contrast.treat2}. Arrow width is the share of the estimate travelling that way.`,
     };

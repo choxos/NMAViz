@@ -16,8 +16,9 @@
  */
 
 import { studyContributions } from "../../nma/projection.js";
-import { escape, number, percent, shortLabel } from "../ui.js";
+import { effect, escape, number, percent, shortLabel } from "../ui.js";
 import { contrastEmphasis, drawNodes, nodeRadii, scaleBetween } from "./draw.js";
+import { sensitivityOf } from "../state.js";
 
 /* Trials grouped by the set of treatments they compare. Two trials with the
  * same set have the same design, in the sense of the design-by-treatment
@@ -45,7 +46,64 @@ export function designs(model) {
   return [...grouped.values()].sort((a, b) => b.trials.length - a.trials.length);
 }
 
+/* The two results, side by side, with the original first. */
+function sensitivityPanel(context, check) {
+  if (!check) return "";
+  const { state, measure } = context;
+  const names = state.excluded.join(", ");
+
+  if (check.error)
+    return `
+      <section class="inspector-section sensitivity broken">
+        <h3>Without ${escape(names)}</h3>
+        <p class="inspector-note">
+          ${escape(check.error)} Leaving ${
+            state.excluded.length === 1 ? "that trial" : "those trials"
+          } out does not widen this estimate, it removes it: there is no longer a chain of
+          comparisons connecting every treatment, so no network estimate exists at all.
+        </p>
+      </section>`;
+
+  if (!check.full || !check.without) return "";
+  const widened = check.without.seTE / check.full.seTE;
+  const moved = Math.abs(check.without.TE - check.full.TE) / check.full.seTE;
+
+  return `
+    <section class="inspector-section sensitivity">
+      <h3>With and without ${escape(names)}</h3>
+      <dl class="estimates">
+        <div>
+          <dt>All trials</dt>
+          <dd>${effect(check.full.TE, check.full.seTE, measure)}</dd>
+        </div>
+        <div>
+          <dt>Without ${state.excluded.length === 1 ? "it" : "them"}</dt>
+          <dd>${effect(check.without.TE, check.without.seTE, measure)}</dd>
+        </div>
+      </dl>
+      <p class="inspector-note">
+        The standard error ${
+          widened >= 1 ? "grows" : "shrinks"
+        } by a factor of ${number(widened, 2)}, and the estimate moves
+        ${number(moved, 2)} of its own standard errors. A trial that carries a lot of current is
+        not automatically a trial whose removal matters: those are different quantities, and this
+        is the one that answers what happens if it is not there.
+      </p>
+    </section>`;
+}
+
+/* Where excluded trials sit. Bottom left of the clear area, out of the way of
+ * the network and never over it. */
+function trayBox(box) {
+  const width = Math.min(300, (box.right - box.left) * 0.42);
+  const height = 78;
+  return { x: box.left + 4, y: box.bottom - height, width, height };
+}
+
 export const bipartite = {
+  // The tray is a control that changes the evidence, so the canvas leaves
+  // room for the deck that reports what it did.
+  deck: true,
   // Draws the treatments where the shared arrangement puts them, so the
   // reader can pick one up and move it.
   spatial: true,
@@ -108,29 +166,79 @@ export const bipartite = {
       )
       .join("");
 
+    const left = new Set(state.excluded);
+    const sizeOf = (trial) =>
+      scaleBetween(
+        Math.sqrt(trial.weight),
+        Math.sqrt(Math.min(...weights)),
+        Math.sqrt(Math.max(...weights)),
+        5,
+        13
+      );
+
     const trialNodes = placed
+      .filter((trial) => !left.has(trial.studlab))
       .map((trial) => {
-        const size = scaleBetween(
-          Math.sqrt(trial.weight),
-          Math.sqrt(Math.min(...weights)),
-          Math.sqrt(Math.max(...weights)),
-          5,
-          13
-        );
+        const size = sizeOf(trial);
         const share = (influence.get(trial.studlab) ?? 0) / strongest;
+        const carried =
+          context.carrying?.kind === `trial:${trial.studlab}` && context.carrying.at
+            ? {
+                x: context.box.left + context.carrying.at.u * (context.box.right - context.box.left),
+                y: context.box.top + context.carrying.at.v * (context.box.bottom - context.box.top),
+              }
+            : null;
+        const x = carried?.x ?? trial.x;
+        const y = carried?.y ?? trial.y;
         return `
-          <g class="trial${trial.arms.length > 2 ? " multi" : ""}" data-study="${escape(
-            trial.studlab
-          )}">
-            <title>${escape(trial.studlab)}: ${trial.arms.length} arms, ${escape(
-              trial.arms.join(" vs ")
-            )}</title>
-            <rect x="${(trial.x - size / 2).toFixed(1)}" y="${(trial.y - size / 2).toFixed(1)}"
+          <g class="trial${trial.arms.length > 2 ? " multi" : ""}${
+            carried ? " lifted" : ""
+          }" data-study="${escape(trial.studlab)}" data-prop="trial:${escape(trial.studlab)}">
+            <circle class="hit-node" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="14"/>
+            <rect x="${(x - size / 2).toFixed(1)}" y="${(y - size / 2).toFixed(1)}"
               width="${size.toFixed(1)}" height="${size.toFixed(1)}" rx="2.5"
               opacity="${(0.35 + 0.65 * share).toFixed(3)}"/>
           </g>`;
       })
       .join("");
+
+    // The tray. A trial dropped into it comes out of the analysis, which is
+    // refitted without it; a trial dragged back out goes in again. It is the
+    // one control on this site that changes the evidence, so it is drawn as a
+    // separate place with a lid on it rather than as a control among controls.
+    const tray = trayBox(context.box);
+    const shelved = placed
+      .filter((trial) => left.has(trial.studlab))
+      .map((trial, i) => {
+        const perRow = Math.max(1, Math.floor((tray.width - 22) / 26));
+        const size = sizeOf(trial);
+        const x = tray.x + 18 + (i % perRow) * 26;
+        const y = tray.y + 26 + Math.floor(i / perRow) * 24;
+        return `
+          <g class="trial shelved" data-study="${escape(trial.studlab)}" data-prop="trial:${escape(
+            trial.studlab
+          )}">
+            <circle class="hit-node" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="14"/>
+            <rect x="${(x - size / 2).toFixed(1)}" y="${(y - size / 2).toFixed(1)}"
+              width="${size.toFixed(1)}" height="${size.toFixed(1)}" rx="2.5"/>
+          </g>`;
+      })
+      .join("");
+
+    const trayMarkup = `
+      <g class="tray${left.size ? " loaded" : ""}${
+        context.carrying?.kind?.startsWith("trial:") ? " open" : ""
+      }">
+        <rect class="tray-body" x="${tray.x}" y="${tray.y}" width="${tray.width}" height="${
+          tray.height
+        }" rx="10"/>
+        <text class="tray-label" x="${tray.x + 12}" y="${tray.y + 15}">${
+          left.size
+            ? `Left out: ${left.size} ${left.size === 1 ? "trial" : "trials"}`
+            : "Drag a trial here to leave it out"
+        }</text>
+        ${shelved}
+      </g>`;
 
     const multiArm = placed.filter((t) => t.arms.length > 2);
     const rows = groups
@@ -207,11 +315,46 @@ export const bipartite = {
       }
     `;
 
+    // What leaving those trials out did to the comparison being looked at. The
+    // original stays on screen beside it: a sensitivity analysis that replaces
+    // the result rather than sitting next to it is a way to lose track of which
+    // number is which.
+    const check = state.excluded.length ? sensitivityOf(state.contrast, state.model) : null;
+
     return {
       stage: `<g class="arms">${arms}</g><g class="trials">${trialNodes}</g>
-        <g class="nodes">${drawNodes(context, { emphasis: contrastEmphasis(state), radii })}</g>`,
-      inspector,
-      note: `Circles are treatments, squares are trials, and a line is an arm. Multi-arm trials touch three or more treatments at once. The separation control spreads trials of the same design apart.`,
+        <g class="nodes">${drawNodes(context, {
+          emphasis: contrastEmphasis(state),
+          radii,
+        })}</g>${trayMarkup}`,
+      inspector: `${sensitivityPanel(context, check)}${inspector}`,
+      controls: state.excluded.length
+        ? `
+          <div class="console-group">
+            <span class="console-label">Left out</span>
+            <span class="deck-reading">${state.excluded.length}</span>
+            <button type="button" class="deck-button primary" data-restore="all">Put them all back</button>
+          </div>
+          <div class="console-group">
+            <span class="console-label">${
+              check?.error ? "Result" : "Standard error"
+            }</span>
+            <span class="deck-reading">${
+              check?.error
+                ? "no estimate"
+                : check?.full && check?.without
+                  ? `${number(check.full.seTE, 3)} → ${number(check.without.seTE, 3)}`
+                  : "—"
+            }</span>
+          </div>`
+        : "",
+      note: state.excluded.length
+        ? `${state.excluded.length} ${
+            state.excluded.length === 1 ? "trial is" : "trials are"
+          } out of the analysis. The network is refitted without ${
+            state.excluded.length === 1 ? "it" : "them"
+          }, tau squared included, and both results are shown.`
+        : `Circles are treatments, squares are trials, and a line is an arm. Multi-arm trials touch three or more treatments at once. Drag a trial into the tray to see what the network looks like without it.`,
     };
   },
 };

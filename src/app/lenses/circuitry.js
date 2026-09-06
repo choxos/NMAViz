@@ -134,13 +134,44 @@ export function sourceBranch(a, b, box) {
   const ty = b.y - a.y;
   const tl = Math.hypot(tx, ty) || 1;
 
+  // The branch is cut in two so that a plug can be taken out of it. The cut is
+  // near a, the treatment the current is driven into, because that is where a
+  // reader looks for the thing that connects the source to the network.
+  const lerp = (p, q, t) => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
+  const on = (t) => lerp(lerp(b, control, t), lerp(control, a, t), t);
+  const tangent = (t) => {
+    const from = lerp(b, control, t);
+    const to = lerp(control, a, t);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { x: dx / len, y: dy / len };
+  };
+
+  const CUT = 0.74;
+  const MOUTH = 0.9;
+
   return {
     // Drawn from b to a: outside the network the current returns to where it
     // was injected.
     d: `M${b.x.toFixed(1)} ${b.y.toFixed(1)}Q${control.x.toFixed(1)} ${control.y.toFixed(
       1
     )} ${a.x.toFixed(1)} ${a.y.toFixed(1)}`,
+    // The live half: from b, through the source, up to where the cable leaves.
+    live: `M${b.x.toFixed(1)} ${b.y.toFixed(1)}Q${lerp(b, control, CUT).x.toFixed(1)} ${lerp(
+      b,
+      control,
+      CUT
+    ).y.toFixed(1)} ${on(CUT).x.toFixed(1)} ${on(CUT).y.toFixed(1)}`,
+    // The stub the socket is mounted on, running into a.
+    stub: `M${on(MOUTH).x.toFixed(1)} ${on(MOUTH).y.toFixed(1)}L${a.x.toFixed(1)} ${a.y.toFixed(
+      1
+    )}`,
+    cut: on(CUT),
+    mouth: on(MOUTH),
+    mouthDirection: tangent(MOUTH),
     source: sourceMarkup(apex, { x: -tx / tl, y: -ty / tl }),
+    sourceAt: apex,
   };
 }
 

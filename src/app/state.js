@@ -32,6 +32,15 @@ export const state = {
   // Treatments the reader has placed by hand, as fractions of the clear box so
   // that a pinned treatment stays where it was put when the window resizes.
   pins: {}, // treatment -> { u, v }
+  // Where the plug is. Seated in its socket by default; once pulled out it
+  // hangs at the box-relative point it was dropped, and the circuit is open.
+  plug: null, // null when seated, else { u, v }
+  // Trials pulled out of the analysis, and the refit without them. This is the
+  // one control on the site that changes the evidence rather than the question
+  // or the drawing, so it is kept apart: the original fit stays in `fit` and is
+  // shown beside the sensitivity one, never replaced by it.
+  excluded: [], // study labels
+  sensitivity: null, // { fit, error } | null
 };
 
 export const subscribe = (listener) => {
@@ -67,13 +76,26 @@ export function load(dataset, rows) {
       selection: null,
       separation: 0,
       pins: {},
+      plug: null,
+      excluded: [],
+      sensitivity: null,
       // Machine settings belong to the network they were set on: a held walk
       // step or a switched-off source means nothing on the next dataset.
       options: {},
       panel: null,
     });
   } catch (error) {
-    update({ error: error.message, fit: null, dataset, rows, pins: {}, panel: "data" });
+    update({
+      error: error.message,
+      fit: null,
+      dataset,
+      rows,
+      pins: {},
+      plug: null,
+      excluded: [],
+      sensitivity: null,
+      panel: "data",
+    });
   }
 }
 
@@ -95,3 +117,54 @@ export const directEdge = (treat1, treat2) =>
       (edge.treat1 === treat1 && edge.treat2 === treat2) ||
       (edge.treat1 === treat2 && edge.treat2 === treat1)
   ) ?? null;
+
+/* Leave a set of trials out and refit without them.
+ *
+ * A trial is removed whole, arms and all, because a multi-arm trial is one
+ * correlated object and dropping one of its contrasts would be dropping a piece
+ * of evidence that does not exist on its own.
+ *
+ * Removing enough trials can break the network into pieces that no longer share
+ * a comparison, and that is a different outcome from a wide interval rather than
+ * an extreme case of one: there is no estimate at all, not a bad one. So the
+ * failure is kept as a message rather than smuggled in as a very large standard
+ * error.
+ *
+ * Tau squared is re-estimated on what is left, which is the usual convention for
+ * a leave-one-out analysis and is worth stating because the other convention,
+ * holding it fixed at the full-network value, gives different intervals.
+ */
+export function setExcluded(labels) {
+  const excluded = [...new Set(labels)];
+  if (!excluded.length) return update({ excluded, sensitivity: null });
+
+  const left = new Set(excluded);
+  const kept = state.rows.filter((row) => !left.has(row.studlab));
+  if (!kept.length)
+    return update({ excluded, sensitivity: { fit: null, error: "Nothing is left to analyze." } });
+
+  try {
+    update({ excluded, sensitivity: { fit: fitNetwork(kept), error: null } });
+  } catch (error) {
+    update({ excluded, sensitivity: { fit: null, error: error.message } });
+  }
+}
+
+/* The comparison of interest under both fits, for a lens that wants to show
+ * what leaving those trials out did. */
+export function sensitivityOf(contrast, model = "common") {
+  if (!contrast || !state.fit) return null;
+  const pick = (fit) => {
+    const half = model === "random" ? fit?.random : fit?.common;
+    const i = half?.index.get(contrast.treat1);
+    const j = half?.index.get(contrast.treat2);
+    if (i == null || j == null) return null;
+    return { TE: half.TE[i][j], seTE: half.seTE[i][j] };
+  };
+  return {
+    full: pick(state.fit),
+    without: state.sensitivity?.fit ? pick(state.sensitivity.fit) : null,
+    error: state.sensitivity?.error ?? null,
+    excluded: state.excluded,
+  };
+}

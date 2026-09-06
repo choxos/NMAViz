@@ -13,7 +13,7 @@ import { describe, tipMarkup } from "./tips.js";
 import { makeRig, releaseFrom, stepRig } from "./play.js";
 import { LENSES } from "./lenses/index.js";
 import { nodeRadii } from "./lenses/draw.js";
-import { activeModel, load, state, subscribe, update } from "./state.js";
+import { activeModel, load, setExcluded, state, subscribe, update } from "./state.js";
 import { ICONS, escape, number, percent, shortLabel } from "./ui.js";
 import examples from "../data/examples.json";
 import { readNetwork, MEASURES } from "../nma/parse.js";
@@ -582,6 +582,7 @@ function renderStage() {
     box,
     pinned: held,
     rig,
+    carrying,
     measure: state.dataset?.measure ?? "MD",
     dataset: state.dataset,
   };
@@ -682,6 +683,178 @@ async function loadFile(file) {
   } catch (error) {
     update({ error: error.message, panel: "data" });
   }
+}
+
+/* ---- Props ----------------------------------------------------------------
+ *
+ * Things on the canvas the reader picks up. A prop is dragged like a treatment
+ * but obeys different rules on release: it either seats in the one place it
+ * belongs or it stays where it was dropped, and either way something about the
+ * model changes rather than something about the drawing.
+ */
+
+let carrying = null;
+let carryFrame = null;
+
+function startProp(event) {
+  const prop = event.target.closest?.("[data-prop]");
+  if (!prop) return false;
+  const at = boxFraction(event);
+  if (!at) return false;
+  carrying = {
+    kind: prop.dataset.prop,
+    pointerId: event.pointerId,
+    moved: false,
+    at,
+    candidate: null,
+    // A probe cannot be put on the treatment the other probe is already on:
+    // there is no comparison of a treatment with itself.
+    avoid:
+      prop.dataset.prop === "probe-from"
+        ? state.contrast?.treat2
+        : prop.dataset.prop === "probe-to"
+          ? state.contrast?.treat1
+          : null,
+  };
+  hideTip();
+  document.querySelector("#stage").classList.add("carrying");
+  return true;
+}
+
+function moveProp(event) {
+  if (!carrying || event.pointerId !== carrying.pointerId) return;
+  const at = boxFraction(event);
+  if (!at) return;
+  carrying.moved = true;
+
+  if (carrying.kind === "plug") {
+    state.plug = clampPin(at);
+  } else {
+    carrying.at = at;
+    // A probe commits nothing while it travels. It names the treatment it
+    // would land on, and only a release decides. Refitting every lens each
+    // time the pointer crossed a node would make the whole screen flicker
+    // through questions nobody asked.
+    carrying.candidate = nearestTreatment(at, carrying.kind === "dropper" ? null : carrying.avoid);
+  }
+
+  if (carryFrame) return;
+  carryFrame = requestAnimationFrame(() => {
+    carryFrame = null;
+    renderStage();
+  });
+}
+
+function endProp(event) {
+  if (!carrying || (event && event.pointerId !== carrying.pointerId)) return;
+  const { kind, moved, candidate, at: carriedAt } = carrying;
+  carrying = null;
+  document.querySelector("#stage").classList.remove("carrying");
+
+  if (kind === "plug") {
+    // Dropped close enough to its socket, a plug goes in. This is the only
+    // place on the canvas with a magnet, and it needs one: hunting for a
+    // pixel-exact seat is not a thing anyone enjoys twice.
+    if (moved && state.plug && nearSocket(state.plug)) state.plug = null;
+    return update({});
+  }
+
+  if (kind.startsWith("trial:")) {
+    const label = kind.slice(6);
+    if (!moved) return update({});
+    // In the tray it comes out of the analysis; out of the tray it goes back
+    // in. Nothing in between: a trial is either evidence or it is not.
+    const inside = overTray(carriedAt);
+    const already = state.excluded.includes(label);
+    if (inside && !already) return setExcluded([...state.excluded, label]);
+    if (!inside && already) return setExcluded(state.excluded.filter((s) => s !== label));
+    return update({});
+  }
+
+  // A probe or a capsule released over nothing goes back where it was. There
+  // is no such thing as measuring across empty space.
+  if (!moved || !candidate) return update({});
+
+  if (kind === "probe-from" && state.contrast)
+    return update({ contrast: { ...state.contrast, treat1: candidate } });
+  if (kind === "probe-to" && state.contrast)
+    return update({ contrast: { ...state.contrast, treat2: candidate } });
+  if (kind === "dropper")
+    // The walk starts where the capsule lands, and starts over: the variance
+    // series it drives is the series for that origin and no other.
+    return update({ options: { ...state.options, origin: candidate, walk: undefined } });
+
+  update({});
+}
+
+/* The treatment nearest a point, if one is near enough to have been meant.
+ *
+ * On a dense network the invisible hit areas overlap, so which node the reader
+ * intended cannot be read off a hit test. The nearest centre within a generous
+ * radius is the honest answer, and the drawing says out loud which one that is
+ * before anything is committed.
+ */
+function nearestTreatment(fraction, avoid) {
+  const model = activeModel();
+  if (!model || !lastBox || !lastPoints) return null;
+  const x = lastBox.left + fraction.u * (lastBox.right - lastBox.left);
+  const y = lastBox.top + fraction.v * (lastBox.bottom - lastBox.top);
+  let best = null;
+  let bestDistance = 64;
+  lastPoints.forEach((point, i) => {
+    const name = model.treatments[i];
+    if (name === avoid) return;
+    const distance = Math.hypot(point.x - x, point.y - y);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = name;
+    }
+  });
+  return best;
+}
+
+/* Whether a dropped trial landed in the tray, read off the drawing so the
+ * target and the thing being aimed at can never drift apart. */
+function overTray(fraction) {
+  const tray = document.querySelector("#stage .tray-body");
+  const box = lastBox;
+  if (!tray || !box || !fraction) return false;
+  const x = box.left + fraction.u * (box.right - box.left);
+  const y = box.top + fraction.v * (box.bottom - box.top);
+  const bounds = tray.getBBox?.();
+  if (!bounds) return false;
+  return (
+    x >= bounds.x - 10 &&
+    x <= bounds.x + bounds.width + 10 &&
+    y >= bounds.y - 10 &&
+    y <= bounds.y + bounds.height + 10
+  );
+}
+
+/* Whether a hanging plug is over its socket, in box fractions. */
+function nearSocket(plug) {
+  const seat = socketFraction();
+  if (!seat) return false;
+  const box = lastBox;
+  const dx = (plug.u - seat.u) * (box.right - box.left);
+  const dy = (plug.v - seat.v) * (box.bottom - box.top);
+  return Math.hypot(dx, dy) < 42;
+}
+
+/* Where the socket sits, read off the drawing rather than recomputed, so the
+ * magnet cannot drift away from the thing it is snapping to. */
+function socketFraction() {
+  const socket = document.querySelector("#stage .socket");
+  const box = lastBox;
+  if (!socket || !box) return null;
+  const bounds = socket.getBBox?.();
+  if (!bounds) return null;
+  const x = bounds.x + bounds.width / 2;
+  const y = bounds.y + bounds.height / 2;
+  return {
+    u: (x - box.left) / Math.max(1, box.right - box.left),
+    v: (y - box.top) / Math.max(1, box.bottom - box.top),
+  };
 }
 
 /* ---- The springs rig -------------------------------------------------------
@@ -1035,6 +1208,17 @@ function wire() {
 
     // Clicking a node or an edge on the canvas selects it; clicking a pair of
     // nodes in turn sets the comparison of interest.
+    const plugButton = event.target.closest("[data-plug]");
+    if (plugButton) {
+      if (plugButton.dataset.plug === "in") return update({ plug: null });
+      // Pulled by click rather than by hand, it lands a little below its
+      // socket, where it is plainly out and plainly still reachable.
+      const seat = socketFraction();
+      return update({ plug: clampPin({ u: (seat?.u ?? 0.5) - 0.05, v: (seat?.v ?? 0.5) + 0.16 }) });
+    }
+
+    if (event.target.closest("[data-restore]")) return setExcluded([]);
+
     if (event.target.closest("#reset-arrangement")) return update({ pins: {} });
 
     const play = event.target.closest("[data-play]");
@@ -1101,12 +1285,28 @@ function wire() {
   // A card that outlived what it described would be worse than none.
   stage.addEventListener("pointerdown", hideTip);
   addEventListener("blur", hideTip);
-  stage.addEventListener("pointerdown", startDrag);
-  stage.addEventListener("pointermove", moveDrag);
-  stage.addEventListener("pointerup", endDrag);
-  stage.addEventListener("pointercancel", endDrag);
+  // A press picks up whichever thing it landed on, in order of specificity: a
+  // prop first, then the springs bundle, then the treatment underneath.
+  stage.addEventListener("pointerdown", (event) => {
+    if (startProp(event)) return;
+    if (startPull(event)) return;
+    startDrag(event);
+  });
+  stage.addEventListener("pointermove", (event) => {
+    moveProp(event);
+    movePull(event);
+    moveDrag(event);
+  });
+  const release = (event) => {
+    endProp(event);
+    endPull(event);
+    endDrag(event);
+  };
+  stage.addEventListener("pointerup", release);
+  stage.addEventListener("pointercancel", release);
   // A pointer released outside the canvas still ends the drag.
   window.addEventListener("pointerup", (event) => {
+    endProp(event);
     endPull(event);
     endDrag(event);
   });
