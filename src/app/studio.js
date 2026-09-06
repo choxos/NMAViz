@@ -10,6 +10,7 @@
 
 import { LAYOUTS, frame, relieveOverlap, stressOf } from "./layout.js";
 import { describe, tipMarkup } from "./tips.js";
+import { makeRig, releaseFrom, stepRig } from "./play.js";
 import { LENSES } from "./lenses/index.js";
 import { nodeRadii } from "./lenses/draw.js";
 import { activeModel, load, state, subscribe, update } from "./state.js";
@@ -26,7 +27,8 @@ import { readNetwork, MEASURES } from "../nma/parse.js";
 const THEME_KEY = "nmaviz-theme";
 const THEMES = {
   light: { next: "dark", icon: "moon", label: "Switch to the night theme" },
-  dark: { next: "arcade", icon: "scope", label: "Switch to the instrument theme" },
+  dark: { next: "mono", icon: "contrast", label: "Switch to the black and white theme" },
+  mono: { next: "arcade", icon: "scope", label: "Switch to the instrument theme" },
   arcade: { next: "light", icon: "sun", label: "Switch back to the paper theme" },
 };
 
@@ -88,6 +90,7 @@ function shell() {
 
       <aside class="panel controls" id="controls"></aside>
       <aside class="panel inspector" id="inspector"></aside>
+      <div class="panel console" id="console" hidden></div>
       <div class="panel readouts" id="readouts"></div>
       <div class="overlay" id="overlay" hidden></div>
       <div class="tip" id="tip" role="tooltip" hidden></div>
@@ -531,8 +534,11 @@ function renderStage() {
     right: wide ? width - 372 : width - 20,
     top: wide ? 150 : 96,
     // On a narrow window every panel is stacked along the bottom, so the
-    // network keeps the top of the screen to itself.
-    bottom: wide ? height - 118 : Math.max(200, height * 0.36),
+    // network keeps the top of the screen to itself. A lens with a deck needs
+    // another band cleared for it.
+    bottom: wide
+      ? height - (LENSES.find((l) => l.id === state.lens)?.deck ? 202 : 118)
+      : Math.max(200, height * 0.36),
   };
   const framed = framedPoints(model, box);
   // A treatment the reader has dragged goes exactly where they put it. The
@@ -561,6 +567,7 @@ function renderStage() {
       : { ...framed.meta, stress: stressOf(points, model.resistance) };
 
   const lens = LENSES.find((l) => l.id === state.lens) ?? LENSES[0];
+  syncRig(model);
   const context = {
     frame: frameCount,
     fit: state.fit,
@@ -574,6 +581,7 @@ function renderStage() {
     // back inward rather than sliding under the inspector.
     box,
     pinned: held,
+    rig,
     measure: state.dataset?.measure ?? "MD",
     dataset: state.dataset,
   };
@@ -599,6 +607,17 @@ function renderStage() {
     }
   }
   inspector.innerHTML = drawn.inspector ?? "";
+
+  // The controls a lens offers for working its mechanism, rather than for
+  // choosing what to look at. They sit on the deck under the canvas because
+  // that is where the hands go.
+  const deck = document.querySelector("#console");
+  const controls = drawn.controls ?? "";
+  if (deck.dataset.markup !== controls) {
+    deck.dataset.markup = controls;
+    deck.innerHTML = controls;
+  }
+  deck.hidden = !controls;
   document.querySelector("#lens-title").textContent = lens.name;
   document.querySelector("#lens-note").textContent = drawn.note ?? lens.tagline;
   document.querySelector("#dataset-name").textContent = state.dataset?.name ?? "";
@@ -654,6 +673,117 @@ async function loadFile(file) {
   } catch (error) {
     update({ error: error.message, panel: "data" });
   }
+}
+
+/* ---- The springs rig -------------------------------------------------------
+ *
+ * The one piece of this interface that has state of its own rather than being a
+ * function of the data. It is deliberately not in the shared state object: it
+ * changes sixty times a second while a spring is swinging, and the rest of the
+ * screen has no business being told about that.
+ */
+
+let rig = null;
+let rigKey = null;
+let rigFrame = null;
+let rigLast = 0;
+
+/* The springs of the parallel bundle for the comparison being looked at: the
+ * studies that compared these two treatments directly, each with its own effect
+ * as a natural length and its own precision as a stiffness. */
+function rigFor(model, contrast) {
+  if (!contrast) return null;
+  const edge = model.direct.find(
+    (e) =>
+      (e.treat1 === contrast.treat1 && e.treat2 === contrast.treat2) ||
+      (e.treat1 === contrast.treat2 && e.treat2 === contrast.treat1)
+  );
+  // One study is not an assembly: there is nothing to balance against.
+  if (!edge || edge.rows.length < 2) return null;
+  const sign = edge.treat1 === contrast.treat1 ? 1 : -1;
+  return makeRig(
+    edge.rows.map((row) => ({ k: 1 / row.seTE ** 2, y: sign * row.TE, label: row.studlab }))
+  );
+}
+
+function syncRig(model) {
+  const wanted =
+    state.lens === "springs" && state.contrast
+      ? `${state.dataset?.id}\u0000${state.model}\u0000${state.contrast.treat1}\u0000${state.contrast.treat2}`
+      : null;
+  if (wanted === rigKey) return;
+  rigKey = wanted;
+  rig = wanted ? rigFor(model, state.contrast) : null;
+  stopRig();
+}
+
+function stopRig() {
+  if (rigFrame) cancelAnimationFrame(rigFrame);
+  rigFrame = null;
+}
+
+function runRig() {
+  if (rigFrame || !rig) return;
+  rigLast = performance.now();
+  const step = (now) => {
+    rigFrame = null;
+    if (!rig) return;
+    const moving = stepRig(rig, (now - rigLast) / 1000);
+    rigLast = now;
+    renderStage();
+    if (moving || rig.held) rigFrame = requestAnimationFrame(step);
+    else renderControls();
+  };
+  rigFrame = requestAnimationFrame(step);
+}
+
+/* Pulling the bundle. The springs lens draws on its own effect axis, so it
+ * publishes the two numbers needed to read a pointer position back as a value.
+ */
+let pulling = null;
+
+function valueAtPointer(event) {
+  const group = document.querySelector(".springs[data-middle]");
+  const stage = document.querySelector("#stage");
+  if (!group || !stage) return null;
+  const middle = Number(group.dataset.middle);
+  const scale = Number(group.dataset.scale);
+  if (!Number.isFinite(middle) || !Number.isFinite(scale) || scale === 0) return null;
+  const rect = stage.getBoundingClientRect();
+  const x = ((event.clientX - rect.left) / rect.width) * stage.clientWidth;
+  return (x - middle) / scale;
+}
+
+function startPull(event) {
+  if (!rig) return false;
+  if (!event.target.closest?.("[data-bob]")) return false;
+  const value = valueAtPointer(event);
+  if (value == null) return false;
+  pulling = event.pointerId;
+  rig.held = true;
+  rig.running = false;
+  rig.v = 0;
+  rig.x = value;
+  hideTip();
+  renderStage();
+  return true;
+}
+
+function movePull(event) {
+  if (pulling == null || event.pointerId !== pulling || !rig) return;
+  const value = valueAtPointer(event);
+  if (value == null) return;
+  rig.x = value;
+  renderStage();
+}
+
+function endPull(event) {
+  if (pulling == null || (event && event.pointerId !== pulling)) return;
+  pulling = null;
+  if (!rig) return;
+  rig.held = false;
+  rig.running = true;
+  runRig();
 }
 
 /* ---- The hover card --------------------------------------------------------
@@ -848,10 +978,13 @@ function wire() {
     if (layoutButton) return update({ layout: layoutButton.dataset.layout });
 
     const option = event.target.closest("[data-option]");
-    if (option)
-      return update({
-        options: { ...state.options, [option.dataset.option]: option.dataset.value },
-      });
+    if (option) {
+      const options = { ...state.options };
+      // A control can hand the lens back to its own clock by choosing "auto".
+      if (option.dataset.value === "auto") delete options[option.dataset.option];
+      else options[option.dataset.option] = option.dataset.value;
+      return update({ options });
+    }
 
     const example = event.target.closest("[data-example]");
     if (example) return loadExample(example.dataset.example);
@@ -869,6 +1002,23 @@ function wire() {
     // Clicking a node or an edge on the canvas selects it; clicking a pair of
     // nodes in turn sets the comparison of interest.
     if (event.target.closest("#reset-arrangement")) return update({ pins: {} });
+
+    const play = event.target.closest("[data-play]");
+    if (play && rig) {
+      if (play.dataset.play === "pull") {
+        // Far enough to swing visibly, in the data's own units.
+        releaseFrom(rig, rig.equilibrium + rig.span * 0.9);
+        runRig();
+      } else {
+        stopRig();
+        rig.x = rig.equilibrium;
+        rig.v = 0;
+        rig.running = false;
+        renderStage();
+        renderControls();
+      }
+      return;
+    }
 
     const node = event.target.closest("[data-treatment]");
     if (node) return chooseTreatment(node.dataset.treatment);
@@ -922,7 +1072,10 @@ function wire() {
   stage.addEventListener("pointerup", endDrag);
   stage.addEventListener("pointercancel", endDrag);
   // A pointer released outside the canvas still ends the drag.
-  window.addEventListener("pointerup", endDrag);
+  window.addEventListener("pointerup", (event) => {
+    endPull(event);
+    endDrag(event);
+  });
 
   const drop = () => document.querySelector("#file-drop");
   app.addEventListener("dragover", (event) => {

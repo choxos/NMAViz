@@ -20,7 +20,7 @@
         try {
           theme = localStorage.getItem("nmaviz-theme");
         } catch {}
-        if (theme !== "dark" && theme !== "light" && theme !== "arcade")
+        if (!["dark", "light", "mono", "arcade"].includes(theme))
           theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
         document.documentElement.dataset.theme = theme;
       })();

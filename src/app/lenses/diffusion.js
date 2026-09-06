@@ -121,15 +121,22 @@ export const diffusionLens = {
   mark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="12" r="6" opacity="0.6"/><circle cx="12" cy="12" r="9.6" opacity="0.3"/></svg>',
   animate: true,
 
+  deck: true,
+
   draw(context) {
     const { model, points, state, frame = 0 } = context;
     if (!state.contrast) return { stage: "", inspector: "", note: "" };
 
     const { partials, mass } = series(context);
+    // The walk runs on its own until the reader takes hold of it, at which
+    // point they own the clock: a process worth watching is a process worth
+    // stopping in the middle of.
+    const held = state.options.walk;
     // Hold on the settled picture for a moment before starting again, so the
     // loop reads as a process that finishes rather than a spinner.
     const cycle = STEPS + 8;
-    const step = Math.min(STEPS, frame % cycle);
+    const step =
+      held == null ? Math.min(STEPS, frame % cycle) : Math.max(0, Math.min(STEPS, Number(held)));
     const here = mass[step];
     const largest = Math.max(...here, 1e-9);
     const radii = nodeRadii(model);
@@ -161,6 +168,32 @@ export const diffusionLens = {
       stage: `<g class="diffusion-edges">${edges}</g><g class="diffusion-halos">${halo}</g>
         <g class="nodes">${drawNodes(context, { emphasis: contrastEmphasis(state), radii })}</g>`,
       inspector: inspector(context, step, partials),
+      controls: `
+        <div class="console-group">
+          <span class="console-label">Walk</span>
+          <button type="button" class="deck-button" data-option="walk" data-value="${Math.max(
+            0,
+            step - 1
+          )}" aria-label="One step back">&#8592;</button>
+          <button type="button" class="deck-button${
+            held == null ? " primary" : ""
+          }" data-option="walk" data-value="${held == null ? String(step) : "auto"}">${
+            held == null ? "Hold" : "Run"
+          }</button>
+          <button type="button" class="deck-button" data-option="walk" data-value="${Math.min(
+            STEPS,
+            step + 1
+          )}" aria-label="One step forward">&#8594;</button>
+        </div>
+        <div class="console-group">
+          <span class="console-label">Step</span>
+          <span class="deck-reading">${step} of ${STEPS}</span>
+          <span class="console-label">Variance explained</span>
+          <span class="deck-reading">${percent(
+            partials[step] / (partials[partials.length - 1] || 1),
+            1
+          )}</span>
+        </div>`,
       note: `A walker released at ${escape(state.contrast.treat1)}, ${step} ${
         step === 1 ? "step" : "steps"
       } in. Half the mass stays behind at each step, which is what makes the series converge on a network with no loop of odd length.`,

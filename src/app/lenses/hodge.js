@@ -28,12 +28,14 @@ function inspector(context, h, component) {
   const share = (part) => (h.energyResidual > 1e-12 ? part / h.energyResidual : 0);
 
   const pills = Object.entries(COMPONENTS)
-    .map(
-      ([id, c]) =>
-        `<button type="button" data-option="hodge" data-value="${id}" class="${
-          component === id ? "active" : ""
-        }">${c.label}</button>`
-    )
+    .map(([id, c]) => {
+      const empty = id === "harmonic" && h.harmonicDimension === 0;
+      return `<button type="button" data-option="hodge" data-value="${id}" class="${
+        component === id ? "active" : ""
+      }"${empty ? ' disabled title="This network has no long-loop inconsistency to show"' : ""}>${
+        c.label
+      }</button>`;
+    })
     .join("");
 
   const loops = h.loops
@@ -80,7 +82,11 @@ function inspector(context, h, component) {
       </div>
       <div>
         <dt>On long loops</dt>
-        <dd>${percent(share(h.energyHarmonic), 1)}</dd>
+        <dd>${
+          h.harmonicDimension === 0
+            ? "none possible"
+            : percent(share(h.energyHarmonic), 1)
+        }</dd>
       </div>
     </dl>
 
@@ -91,6 +97,21 @@ function inspector(context, h, component) {
         The two parts are orthogonal, so these shares add up. A network whose inconsistency is
         mostly harmonic has disagreement that no triangle contains, and checking its loops one
         triangle at a time will not find it.
+      </p>
+      <p class="inspector-note">
+        ${
+          h.harmonicDimension === 0
+            ? `This network has no long-loop inconsistency to find, and that is a fact about its
+               shape rather than about its data. The space such disagreement would live in has
+               dimension zero here, so every loop of four treatments or more has a shortcut across
+               it and checking the triangles checks everything. Most published networks are like
+               this; the reading matters for the ones that are not.`
+            : `The space of long-loop inconsistency has dimension ${h.harmonicDimension} on this
+               network, so there are ${
+                 h.harmonicDimension === 1 ? "directions" : "directions"
+               } of disagreement no triangle can reach. Checking loops one triangle at a time
+               would miss them.`
+        }
       </p>
     </section>
 
@@ -158,7 +179,10 @@ export const hodgeLens = {
         ["Observed direct", number(flip * h.observed[i], 3)],
         ["Consistency fit", number(flip * h.gradient[i], 3)],
         ["Around triangles", number(flip * h.curl[i], 3)],
-        ["Long loops", number(flip * h.harmonic[i], 3)],
+        [
+          "Long loops",
+          h.harmonicDimension === 0 ? "none possible" : number(flip * h.harmonic[i], 3),
+        ],
       ],
       note: "The last three add to the first. The two below it are what no consistency model can explain.",
     };

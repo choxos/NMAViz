@@ -32,13 +32,13 @@ the subject.
 | Lens | What it shows | After |
 | --- | --- | --- |
 | **Network** | Every comparison, with the studies behind it, in an arrangement where the distance between two treatments is the standard error of comparing them. A separation control fans each comparison out into its individual studies. | Rücker 2012 |
-| **Trials** | Trials as nodes of their own, so a multi-arm trial is one object touching three treatments rather than three indistinguishable edges. The designs table is the incomplete block reading. | Davies 2026, Senn 2013 |
+| **Trials** | Trials as nodes of their own, so a multi-arm trial is one object touching three treatments rather than three indistinguishable edges. The designs table is the incomplete block reading. | Drawing after Davies 2026; block reading after Senn 2013; influence shading is Wang 2026 |
 | **Flow** | Where one estimate actually comes from: each comparison oriented the way its current runs, with the routes and their shares. | König, Krahn and Binder 2013 |
 | **Contributions** | Which comparisons, and which trials, the estimate rests on, under both the shortest path and the random walk method at once. | Davies et al 2022, Rücker et al 2024 |
 | **Reconstruction** | What each trial did: a signed amount, in the units of the outcome, and a waterfall that walks to the network estimate with nothing left over. | Wang et al 2026 |
 | **Inconsistency** | The disagreement triangles can see, and the disagreement they cannot, as an orthogonal split of the between-comparison Q. | Jiang et al 2011 |
 | **Diffusion** | How far the evidence had to travel to explain the uncertainty, animated as a convergent series rather than as decoration. | Rücker, Davies and Schwarzer 2026 |
-| **Springs** | The mechanism: studies in parallel, routes in series, on the effect axis. | Papakonstantinou et al 2021 |
+| **Springs** | The mechanism: studies in parallel, routes in series, on the effect axis. Pull the parallel bundle and let it settle. | Papakonstantinou et al 2021 for the pairwise mechanism; routes in series are an extension of it |
 
 ## Data it accepts
 
@@ -85,7 +85,8 @@ numbers rather than to itself:
 - the hat matrix, in netmeta's own row order
 - the common and random effect estimates and standard errors, for every pair
 - the direct and indirect estimates and the direct evidence proportion
-- Q, its degrees of freedom, τ² and I²
+- Q, its degrees of freedom, τ² and I², and its split into what happens within a design and what
+  happens between designs
 - the internal sort order and the multi-arm variance adjustment, row by row
 - the evidence flow measures, and the contribution matrices under both methods
 
@@ -94,7 +95,9 @@ shortest path contribution method, which is held to a looser tolerance on purpos
 available it drains whichever the implementation finds first, and that ambiguity is exactly what
 the random walk method was introduced to remove.
 
-Beyond the comparison with netmeta, the structural claims are tested as claims. Kirchhoff's law
+Beyond the comparison with netmeta, the structural claims are tested as claims. The resting point
+of the springs assembly is the pooled estimate to the last bit, and the energy it still holds there
+is exactly half Cochran's Q, on every comparison of every bundled network. Kirchhoff's law
 holds at every treatment in every flow network. The diffusion series converges to the effective
 resistances the Laplacian gives. The Hodge parts rebuild the observed flow, are orthogonal in the
 precision-weighted inner product, and their energies add to the between-comparison part of Q
@@ -126,7 +129,9 @@ Rscript scripts/examples.R
 ## Choices worth knowing about
 
 **Multi-arm studies.** The model uses netmeta's reduce-weights adjustment, and τ² enters the study
-variances before that adjustment rather than after. Two consequences surface in the interface
+variances before that adjustment rather than after. Cochran's Q is split by design rather than by
+comparison, because summing each comparison's own Q mixes two different weightings once a
+multi-arm study is present and can make the inconsistency term come out negative. Two consequences surface in the interface
 rather than being hidden. The published direct evidence proportion, a ratio of variances computed
 on the studies' original standard errors, separates from the hat matrix entry on the model's own
 weights; both are shown. And the exact within-study covariance, which Wang et al use, would give a
@@ -144,7 +149,19 @@ is measured on the drawing that is actually on screen and printed under the titl
 **Inconsistency.** The Hodge split is computed on one pooled estimate per comparison. Disagreement
 between studies of the same comparison is heterogeneity, not inconsistency, and is not part of it.
 It is a diagnostic to read alongside a design-by-treatment interaction model, not a replacement for
-one.
+one. Its residual is the between-comparison Q, which is not netmeta's between-design Q: on senn2013
+they are 22.459 and 22.530, and the interface names which one it is showing.
+
+**Long-loop inconsistency is usually impossible, not absent.** The harmonic part of the Hodge split
+lives in a space whose dimension is a property of the network's shape, and on all thirteen bundled
+networks that dimension is zero: every loop of four treatments or more has a shortcut across it, so
+checking the triangles checks everything. The lens says "none possible" rather than "0%", because
+those are different statements and only one of them is about the data.
+
+**What Papakonstantinou et al actually cover.** Their paper is about pairwise meta-analysis, and
+says extending the spring system to a network is future work. Studies in parallel, the pooled
+estimate as the resting point, and the energy identity are theirs; routes in series, drawn from the
+flow decomposition, are this site's extension of the idea and are labeled as such.
 
 **Mean path length and minimal parallelism** are computed over comparisons. netmeta groups a
 multi-arm study's comparisons into a single design first, so the two definitions differ where a

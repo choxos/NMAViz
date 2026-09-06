@@ -136,3 +136,44 @@ test("a square with no chord puts its inconsistency in the harmonic part", () =>
     `the ring is inconsistent, so the harmonic part should carry it, not ${h.energyHarmonic}`
   );
 });
+
+/* The harmonic space, counted rather than measured.
+ *
+ * Jiang et al's Lemma 2 says its dimension is the first Betti number of the
+ * clique complex. When that is zero there is no long-loop inconsistency to
+ * find, however dirty the data: the energy is zero because the space is empty.
+ * Every network bundled with this site is of that kind, which is exactly why
+ * the interface has to say so rather than print 0% and leave the reader to
+ * guess their network is clean.
+ */
+test("a network with no harmonic space has no harmonic energy", () => {
+  for (const example of examples) {
+    const fit = fitNetwork(rowsOf(example.contrasts));
+    if (fit.common.treatments.length < 3) continue;
+    const h = hodge(fit.common);
+    assert.ok(
+      Number.isInteger(h.harmonicDimension) && h.harmonicDimension >= 0,
+      `${example.id}: harmonic dimension is ${h.harmonicDimension}`
+    );
+    if (h.harmonicDimension === 0)
+      assert.ok(
+        h.energyHarmonic < 1e-18 * Math.max(1, h.energyTotal),
+        `${example.id}: no harmonic space, yet ${h.energyHarmonic} of harmonic energy`
+      );
+  }
+});
+
+/* And a network that does have one is measured, not assumed away: a four-ring
+ * with no chord is the smallest shape whose disagreement no triangle contains. */
+test("a chordless four-ring has exactly one harmonic direction", () => {
+  const ring = [
+    { studlab: "1", treat1: "A", treat2: "B", TE: 1, seTE: 1 },
+    { studlab: "2", treat1: "B", treat2: "C", TE: 1, seTE: 1 },
+    { studlab: "3", treat1: "C", treat2: "D", TE: 1, seTE: 1 },
+    { studlab: "4", treat1: "D", treat2: "A", TE: 1, seTE: 1 },
+  ];
+  const h = hodge(fitNetwork(ring).common);
+  assert.equal(h.triangleCount, 0, "a chordless ring has no triangles");
+  assert.equal(h.harmonicDimension, 1);
+  assert.ok(h.energyHarmonic > 0, "and its inconsistency is entirely harmonic");
+});

@@ -94,11 +94,6 @@ function inspector(context) {
     : "";
 
   return `
-    <div class="lens-options">
-      <span class="control-label">Drawing</span>
-      <div class="pills">${stylePills(state)}</div>
-    </div>
-
     <header class="inspector-head">
       <span class="inspector-kind">Comparison</span>
       <h2>${escape(state.contrast.treat1)} <span class="versus">vs</span> ${escape(
@@ -182,8 +177,9 @@ function circuit(context, geometry, emphasis) {
   // On a large network a resistor on every wire is a field of zigzags. Above
   // this many comparisons the symbol is kept for the wires that carry the
   // current for the comparison being asked about, and the rest stay plain.
+  const powered = state.options.power !== "off";
   const dense = model.direct.length > 26;
-  const flowing = state.contrast
+  const flowing = powered && state.contrast
     ? new Map(
         evidenceFlow(model, state.contrast.treat1, state.contrast.treat2)?.edges.map((e) => [
           `${e.comparison.treat1} ${e.comparison.treat2}`,
@@ -227,7 +223,7 @@ function circuit(context, geometry, emphasis) {
       // speed is the same everywhere on purpose: in a conductor it is the cross
       // section that carries the current, so here it is the width and only the
       // width that says how much evidence travels this way.
-      const live = (currents ?? liveEdges)?.get(key) ?? 0;
+      const live = powered ? ((currents ?? liveEdges)?.get(key) ?? 0) : 0;
       return `
         <g class="wire${carrying ? " carrying" : ""}${symbol ? "" : " bare"}" data-edge="${escape(
           key
@@ -255,7 +251,7 @@ function circuit(context, geometry, emphasis) {
     if (a && b) {
       const branch = sourceBranch(a, b, box);
       source = `
-        <g class="source">
+        <g class="source${powered ? " live" : " off"}">
           <path class="source-wire" d="${branch.d}"/>
           ${branch.source}
         </g>`;
@@ -267,14 +263,41 @@ function circuit(context, geometry, emphasis) {
       <g class="nodes">${drawNodes(context, { emphasis, radii: nodeRadii(model) })}</g>`,
     inspector: inspector(context),
     style: "circuit",
+    controls: `
+      <div class="console-group">
+        <span class="console-label">Drawing</span>
+        <div class="pills">${stylePills(state)}</div>
+      </div>
+      <div class="console-group">
+        <span class="console-label">Source</span>
+        <button type="button" class="switch" id="power" data-option="power"
+          data-value="${powered ? "off" : "on"}" aria-pressed="${powered}"
+          aria-label="${powered ? "Switch the source off" : "Switch the source on"}"></button>
+        <span class="lamp${powered && state.contrast ? " lit" : ""}"></span>
+      </div>
+      <div class="console-group">
+        <span class="console-label">Reading</span>
+        <span class="deck-reading">${
+          state.contrast && powered
+            ? `${number(model.TE[model.index.get(state.contrast.treat1)][
+                model.index.get(state.contrast.treat2)
+              ], 3)} V`
+            : "—"
+        }</span>
+        <span class="console-label">across ${
+          state.contrast ? `${escape(state.contrast.treat1)}, ${escape(state.contrast.treat2)}` : "—"
+        }</span>
+      </div>`,
     note:
-      (state.contrast
-        ? `The source outside the network drives one unit of current from ${escape(
-            state.contrast.treat1
-          )} to ${escape(
-            state.contrast.treat2
-          )}; the potential difference it produces is the estimate and the resistance it meets is the variance. `
-        : "") +
+      (!powered
+        ? "The source is off, so nothing is flowing. What is left is the network itself: every comparison, its resistance, and the studies wired in parallel behind it. "
+        : state.contrast
+          ? `The source drives one unit of current from ${escape(
+              state.contrast.treat1
+            )} to ${escape(
+              state.contrast.treat2
+            )}; the potential difference it produces is the estimate and the resistance it meets is the variance. `
+          : "") +
       `Wire width is precision and wire length is the standard error, as closely as two dimensions allow.` +
       (suppressed
         ? ` ${suppressed} ${
@@ -285,6 +308,9 @@ function circuit(context, geometry, emphasis) {
 }
 
 export const network = {
+  // Offers controls that work the mechanism, so the canvas leaves room for
+  // the deck under it.
+  deck: true,
   // Draws the treatments where the shared arrangement puts them, so the
   // reader can pick one up and move it.
   spatial: true,
@@ -347,6 +373,18 @@ export const network = {
         radii: nodeRadii(model),
       })}</g>`,
       inspector: inspector(context),
+      controls: `
+        <div class="console-group">
+          <span class="console-label">Drawing</span>
+          <div class="pills">${stylePills(state)}</div>
+        </div>
+        <div class="console-group">
+          <span class="console-label">Separation</span>
+          <span class="deck-reading">${percent(state.separation, 0)}</span>
+          <span class="console-label">${
+            state.separation > 0.02 ? "studies shown apart" : "comparisons pooled"
+          }</span>
+        </div>`,
       note,
     };
   },

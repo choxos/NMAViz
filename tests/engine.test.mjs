@@ -160,3 +160,39 @@ test("a zero standard error is refused rather than dividing by zero", () => {
     /standard error/
   );
 });
+
+/* Cochran's Q, split by design.
+ *
+ * Checked against netmeta's own decomp.design rather than against this
+ * implementation. The one network it does not match to machine precision is
+ * Dong 2013, where several multi-arm studies share a design and netmeta's
+ * within-design term is multivariate; the tolerance there is stated rather
+ * than hidden, and the property that matters, that the two parts are
+ * non-negative and add to the total, is checked exactly on every network.
+ */
+test("Q splits into within-design and between-design parts, as netmeta splits it", () => {
+  const looser = new Set(["dong2013"]);
+  for (const name of names) {
+    const fixture = load(name);
+    const fit = fitNetwork(toRows(fixture.prepared));
+    const decomp = fixture.decomp?.["Q.decomp"];
+    if (!decomp) continue;
+
+    assert.ok(fit.Qheterogeneity >= 0, `${name}: within-design Q is negative`);
+    assert.ok(fit.Qinconsistency >= 0, `${name}: between-design Q is negative`);
+    assert.ok(
+      Math.abs(fit.Qheterogeneity + fit.Qinconsistency - fit.Q) < 1e-9,
+      `${name}: the two parts do not add to the total`
+    );
+
+    const tolerance = looser.has(name) ? 1e-3 : 1e-7;
+    assert.ok(
+      Math.abs(fit.Qheterogeneity - decomp.Q[1]) < tolerance,
+      `${name}: within-design Q is ${fit.Qheterogeneity}, netmeta says ${decomp.Q[1]}`
+    );
+    assert.ok(
+      Math.abs(fit.Qinconsistency - decomp.Q[2]) < tolerance,
+      `${name}: between-design Q is ${fit.Qinconsistency}, netmeta says ${decomp.Q[2]}`
+    );
+  }
+});

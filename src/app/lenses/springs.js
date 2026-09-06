@@ -17,7 +17,8 @@
  */
 
 import { evidenceFlow, flowPaths } from "../../nma/flow.js";
-import { effect, escape, isRatio, percent, shortLabel } from "../ui.js";
+import { rigEnergy } from "../play.js";
+import { effect, escape, isRatio, number, onScale, percent, shortLabel } from "../ui.js";
 
 /* A coil drawn between two points on one line. More turns and a thicker wire
  * mean a stiffer spring, which is a more precise study. */
@@ -42,6 +43,9 @@ function coil(x1, x2, y, stiffness) {
 }
 
 export const springs = {
+  // Offers controls that work the mechanism, so the canvas leaves room for
+  // the deck under it.
+  deck: true,
   id: "springs",
   name: "Springs",
   tagline: "The mechanism: studies in parallel, routes in series",
@@ -158,10 +162,20 @@ export const springs = {
         )} higher</text>
       </g>`;
 
+    // Where the assembly is being held, if the reader is holding it. Only the
+    // parallel bundle is playable, because that is the one place where the
+    // spring picture is exact: the studies of one comparison really are
+    // independent springs, and their resting point really is the pooled
+    // estimate. The routes are not independent of one another, so pulling on
+    // them would be a lie told with a nice animation.
+    const rig = context.rig;
+    const pulled = rig && Math.abs(rig.x - rig.equilibrium) > 1e-12;
+
     const drawn = rows
       .map((row, index) => {
         const y = top + index * gap;
-        const x = at(row.TE);
+        const held = rig && (row.kind === "study" || row.kind === "pooled");
+        const x = at(held ? rig.x : row.TE);
         const stiffness = relative(row.seTE);
         const lower = at(row.TE - 1.96 * row.seTE);
         const upper = at(row.TE + 1.96 * row.seTE);
@@ -180,21 +194,47 @@ export const springs = {
               return `<path class="spring-coil" d="${path}"/>${joint}`;
             })
             .join("");
+        } else if (held) {
+          // A study spring is stretched between its own effect and wherever the
+          // bundle is being held, which is the whole point: the further the
+          // bundle is pulled from a precise study, the harder that study pulls
+          // back, and precision is exactly how hard.
+          body = `<path class="spring-coil" d="${coil(at(row.TE), x, y, stiffness)}"/>
+            <circle class="spring-anchor" cx="${at(row.TE)}" cy="${y}" r="2.6"/>`;
         } else {
           body = `<path class="spring-coil" d="${coil(nullAt, x, y, stiffness)}"/>`;
         }
 
+        const grabbable = row.kind === "pooled" && rig;
         return `
-          <g class="spring-row ${row.kind}">
+          <g class="spring-row ${row.kind}${held && pulled ? " strained" : ""}${
+            grabbable ? " grabbable" : ""
+          }"${grabbable ? ' data-bob="pooled"' : ""}>
             <title>${escape(row.label)}: ${effect(row.TE, row.seTE, measure)}</title>
-            <line class="spring-interval" x1="${lower}" y1="${y}" x2="${upper}" y2="${y}"/>
+            ${held ? "" : `<line class="spring-interval" x1="${lower}" y1="${y}" x2="${upper}" y2="${y}"/>`}
             ${body}
+            ${
+              grabbable
+                ? `<circle class="hit-node" cx="${x}" cy="${y}" r="20"/>`
+                : ""
+            }
             <circle class="spring-end" cx="${x}" cy="${y}" r="${(4 + 4 * stiffness).toFixed(1)}"/>
             <text class="spring-label" x="${left}" y="${y - 13}" text-anchor="start"
               >${escape(shortLabel(row.label, 44))}</text>
           </g>`;
       })
       .join("");
+
+    // The bar the parallel springs all pull on, drawn only when there is one.
+    const bundleRows = rows
+      .map((row, index) => ({ row, index }))
+      .filter(({ row }) => row.kind === "study" || row.kind === "pooled");
+    const yoke =
+      rig && bundleRows.length > 1
+        ? `<line class="spring-yoke" x1="${at(rig.x)}" y1="${
+            top + bundleRows[0].index * gap - 12
+          }" x2="${at(rig.x)}" y2="${top + bundleRows[bundleRows.length - 1].index * gap + 12}"/>`
+        : "";
 
     const inspector = `
       <header class="inspector-head">
@@ -231,6 +271,19 @@ export const springs = {
           their lengths add and their compliances, the reciprocals of stiffness, add too: that is
           why an indirect route is longer, weaker, and wider than any comparison in it.
         </p>
+        ${
+          direct && direct.rows.length > 1
+            ? `<p class="inspector-note">
+                 Pull the parallel bundle along the axis and let it go. It comes back to
+                 ${escape(number(onScale(direct ? orient(direct, treat1) * direct.TE : 0, measure), 3))},
+                 the pooled estimate, because that is the only place the studies' pulls cancel.
+                 The energy the assembly still holds there,
+                 ${escape(number((direct.Q ?? 0) / 2, 2))}, is exactly half Cochran's Q for this
+                 comparison: heterogeneity is the work it takes to hold springs of different
+                 natural lengths at one common place.
+               </p>`
+            : ""
+        }
         <p class="inspector-note">
           The routes drawn here are the ones the evidence actually travels, in the order the flow
           decomposition finds them. The stiffest carries ${
@@ -241,9 +294,43 @@ export const springs = {
     `;
 
     return {
-      stage: `${axis}<g class="springs">${drawn}</g>`,
+      stage: `${axis}<g class="springs" data-middle="${middle}" data-scale="${scale}">${yoke}${drawn}</g>`,
       inspector,
-      note: `Each coil is a spring: its length is an effect, its stiffness is a precision. Parallel is pooling, series is an indirect route.`,
+      controls: rig
+        ? `
+          <div class="console-group">
+            <span class="console-label">Assembly</span>
+            <button type="button" class="deck-button primary" data-play="pull">Pull and release</button>
+            <button type="button" class="deck-button" data-play="settle">Let it rest</button>
+          </div>
+          <div class="console-group">
+            <span class="console-label">Held at</span>
+            <span class="deck-reading">${number(onScale(rig.x, measure), 3)}</span>
+            <span class="console-label">Rests at</span>
+            <span class="deck-reading">${number(onScale(rig.equilibrium, measure), 3)}</span>
+          </div>
+          <div class="console-group">
+            <span class="console-label">Energy stored</span>
+            <span class="deck-reading">${number(rigEnergy(rig), 2)}</span>
+            <span class="console-label">at rest, Q&#8202;/&#8202;2 =</span>
+            <span class="deck-reading">${number((direct?.Q ?? 0) / 2, 2)}</span>
+          </div>`
+        : `
+          <div class="console-group">
+            <span class="console-label">Assembly</span>
+            <span class="deck-reading">—</span>
+            <span class="console-label">${
+              direct
+                ? "one study on this comparison, so there is nothing to balance"
+                : "no direct comparison, so there is no bundle to pull"
+            }</span>
+          </div>`,
+      note: rig
+        ? `Drag the bundle's weight along the axis and let go. It settles at ${number(
+            onScale(rig.equilibrium, measure),
+            3
+          )}, the inverse-variance weighted mean, because that is the one place where the studies' pulls cancel. A precise study is a stiff spring and pulls harder.`
+        : `Each coil is a spring: its length is an effect, its stiffness is a precision. Parallel is pooling, series is an indirect route.`,
     };
   },
 };

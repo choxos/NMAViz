@@ -32,7 +32,7 @@
  */
 
 import { edgeWeights } from "./flow.js";
-import { multiply, pseudoinverseSymmetric, transpose, zeros } from "./matrix.js";
+import { eigenSymmetric, multiply, pseudoinverseSymmetric, transpose, zeros } from "./matrix.js";
 
 /* Every set of three treatments that are all directly compared with each
  * other. These are the loops a triangle-by-triangle check can see. */
@@ -51,6 +51,17 @@ export function triangles(model) {
           found.push([i, j, k]);
     }
   return found;
+}
+
+/* The rank of a symmetric matrix, counted from its eigenvalues against a
+ * tolerance scaled to the largest of them, which is the only scale-free way to
+ * decide what counts as zero. */
+function rank(A, tolerance = 1e-9) {
+  if (!A.length) return 0;
+  const { values } = eigenSymmetric(A);
+  const largest = Math.max(...values.map(Math.abs), 0);
+  if (!(largest > 0)) return 0;
+  return values.filter((v) => Math.abs(v) > tolerance * largest).length;
 }
 
 export function hodge(model) {
@@ -139,6 +150,18 @@ export function hodge(model) {
     };
   });
 
+  // The dimension of the harmonic space, which is the first Betti number of the
+  // clique complex: edges, minus the gradients, minus the curls.
+  //
+  // This matters more than it sounds. When it is zero there is no such thing as
+  // inconsistency that triangles cannot see, and the harmonic part of every
+  // network is exactly zero rather than merely small. Reporting an energy of
+  // 1e-30 without saying that leaves a reader to wonder whether their network
+  // happens to be clean; the truth is that its shape has no room for the thing
+  // being measured. Every network bundled with this site is of that kind.
+  const rankOfCurl = loops.length ? rank(multiply(C, transpose(C))) : 0;
+  const harmonicDimension = Math.max(0, m - Math.max(0, n - 1) - rankOfCurl);
+
   return {
     edges,
     observed,
@@ -147,6 +170,7 @@ export function hodge(model) {
     residual,
     curl,
     harmonic,
+    harmonicDimension,
     loops: loopEnergy.sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap)),
     triangleCount: loops.length,
     energyTotal: energy(observed),
