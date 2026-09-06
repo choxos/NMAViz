@@ -268,6 +268,19 @@ function aboutPanel() {
           <h3>The lenses</h3>
           <ul class="lens-list">${lensList}</ul>
         </section>
+        <section>
+          <h3>What this is not</h3>
+          <p class="sheet-note">
+            It does not fit Bayesian models, rank treatments, produce SUCRA or rankograms, assess
+            risk of bias, or judge transitivity. Nothing here establishes transitivity, absence of
+            bias, or a clinically meaningful ranking: zero inconsistency is not evidence of
+            validity, and a large contribution is not evidence of quality.
+          </p>
+          <p class="sheet-note">
+            Source, tests and the full account of the modeling choices are at
+            <a href="https://github.com/choxos/NMAViz">github.com/choxos/NMAViz</a>.
+          </p>
+        </section>
       </div>
     </div>
   `;

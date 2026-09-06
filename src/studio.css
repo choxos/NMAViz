@@ -511,6 +511,10 @@ input[type="range"] {
   max-width: 74ch;
 }
 
+.sheet-note + .sheet-note {
+  margin-top: 12px;
+}
+
 .sheet-note code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 10.5px;
