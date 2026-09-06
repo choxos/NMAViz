@@ -98,3 +98,56 @@ export function pseudoinverse(X) {
  * stops "-0.0000000001" from appearing in a table. */
 export const clean = (A, tol = 1e-10) =>
   A.map((row) => row.map((x) => (Math.abs(x) < tol ? 0 : x)));
+
+/* Eigendecomposition of a symmetric matrix by the cyclic Jacobi method.
+ *
+ * Networks are small, so the simplest reliable algorithm is the right one:
+ * Jacobi needs no tridiagonalization step, is accurate on the small eigenvalues
+ * that a Laplacian pseudoinverse has, and converges in a handful of sweeps at
+ * these sizes. Returns eigenvalues in descending order with matching columns of
+ * the eigenvector matrix.
+ */
+export function eigenSymmetric(A, { sweeps = 60, tolerance = 1e-12 } = {}) {
+  const n = A.length;
+  const M = A.map((row) => [...row]);
+  let V = identity(n);
+
+  for (let sweep = 0; sweep < sweeps; sweep++) {
+    let offDiagonal = 0;
+    for (let p = 0; p < n - 1; p++)
+      for (let q = p + 1; q < n; q++) offDiagonal += M[p][q] ** 2;
+    if (Math.sqrt(offDiagonal) < tolerance) break;
+
+    for (let p = 0; p < n - 1; p++)
+      for (let q = p + 1; q < n; q++) {
+        if (Math.abs(M[p][q]) < 1e-300) continue;
+        const theta = (M[q][q] - M[p][p]) / (2 * M[p][q]);
+        const t =
+          Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+        const c = 1 / Math.sqrt(t * t + 1);
+        const s = t * c;
+        for (let k = 0; k < n; k++) {
+          const mkp = M[k][p];
+          const mkq = M[k][q];
+          M[k][p] = c * mkp - s * mkq;
+          M[k][q] = s * mkp + c * mkq;
+        }
+        for (let k = 0; k < n; k++) {
+          const mpk = M[p][k];
+          const mqk = M[q][k];
+          M[p][k] = c * mpk - s * mqk;
+          M[q][k] = s * mpk + c * mqk;
+          const vkp = V[k][p];
+          const vkq = V[k][q];
+          V[k][p] = c * vkp - s * vkq;
+          V[k][q] = s * vkp + c * vkq;
+        }
+      }
+  }
+
+  const order = M.map((row, i) => i).sort((a, b) => M[b][b] - M[a][a]);
+  return {
+    values: order.map((i) => M[i][i]),
+    vectors: V.map((row) => order.map((i) => row[i])),
+  };
+}
