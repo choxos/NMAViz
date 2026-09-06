@@ -54,7 +54,7 @@ export const springs = {
   mark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-5 3 10 3-10 3 10 2-5h3"/></svg>',
 
   draw(context) {
-    const { model, state, measure, width, height, dataset } = context;
+    const { model, state, measure, width, height, dataset, box } = context;
     if (!state.contrast) return { stage: "", inspector: "", note: "" };
     const { treat1, treat2 } = state.contrast;
     const a = model.index.get(treat1);
@@ -143,7 +143,10 @@ export const springs = {
     });
 
     const top = 158;
-    const gap = Math.min(54, (height - top - 120) / Math.max(1, rows.length));
+    // The floor is where the panels start, not where the window ends, so the
+    // last row and the axis labels under it stay clear of the deck.
+    const floor = (box?.bottom ?? height - 118) - 46;
+    const gap = Math.min(54, (floor - top) / Math.max(1, rows.length));
     const nullAt = at(0);
 
     const axis = `
