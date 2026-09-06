@@ -77,10 +77,10 @@ for (const example of examples) {
     const pooled = new Map(h.edges.map((e, i) => [`${e.treat1} ${e.treat2}`, h.observed[i]]));
     model.rows.forEach((row, r) => {
       const forward = pooled.has(`${row.treat1} ${row.treat2}`);
-      const centre = forward
+      const center = forward
         ? pooled.get(`${row.treat1} ${row.treat2}`)
         : -pooled.get(`${row.treat2} ${row.treat1}`);
-      within += model.w[r] * (row.TE - centre) ** 2;
+      within += model.w[r] * (row.TE - center) ** 2;
     });
     const between = model.Q - within;
     assert.ok(

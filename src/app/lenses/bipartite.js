@@ -73,7 +73,7 @@ export const bipartite = {
     // which is what makes a repeated design read as a cluster.
     const placed = [];
     for (const group of groups) {
-      const centre = group.arms.reduce(
+      const center = group.arms.reduce(
         (sum, arm) => {
           const p = points[model.index.get(arm)];
           return { x: sum.x + p.x / group.arms.length, y: sum.y + p.y / group.arms.length };
@@ -87,8 +87,8 @@ export const bipartite = {
         placed.push({
           ...trial,
           design: group.key,
-          x: centre.x + Math.cos(angle) * distance,
-          y: centre.y + Math.sin(angle) * distance,
+          x: center.x + Math.cos(angle) * distance,
+          y: center.y + Math.sin(angle) * distance,
         });
       });
     }
