@@ -29,6 +29,9 @@ export const state = {
   // read their own keys and ignore the rest.
   options: {},
   separation: 0, // 0 is the network, 1 is the exploded study inventory
+  // Treatments the reader has placed by hand, as fractions of the clear box so
+  // that a pinned treatment stays where it was put when the window resizes.
+  pins: {}, // treatment -> { u, v }
 };
 
 export const subscribe = (listener) => {
@@ -63,10 +66,11 @@ export function load(dataset, rows) {
       contrast: worst ? { treat1: worst.treat1, treat2: worst.treat2 } : null,
       selection: null,
       separation: 0,
+      pins: {},
       panel: null,
     });
   } catch (error) {
-    update({ error: error.message, fit: null, dataset, rows, panel: "data" });
+    update({ error: error.message, fit: null, dataset, rows, pins: {}, panel: "data" });
   }
 }
 

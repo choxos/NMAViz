@@ -87,6 +87,9 @@ function inspector(context, flow, paths) {
 }
 
 export const flow = {
+  // Draws the treatments where the shared arrangement puts them, so the
+  // reader can pick one up and move it.
+  spatial: true,
   id: "flow",
   name: "Flow",
   tagline: "Where one estimate actually comes from",

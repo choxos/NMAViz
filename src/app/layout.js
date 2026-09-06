@@ -203,8 +203,13 @@ export const LAYOUTS = {
  * fidelity, so the caller measures the stress again afterwards and reports the
  * number that describes the picture on the screen rather than the one before
  * the nudge.
+ *
+ * A treatment the reader has placed by hand is never nudged. They put it there
+ * on purpose, and a drawing that slides out from under the pointer is worse
+ * than two circles touching.
  */
-export function relieveOverlap(points, radii, { padding = 7, rounds = 60 } = {}) {
+export function relieveOverlap(points, radii, { padding = 7, rounds = 60, fixed = null } = {}) {
+  const held = (i) => Boolean(fixed?.has(i));
   const moved = points.map((p) => ({ ...p }));
   for (let round = 0; round < rounds; round++) {
     let worst = 0;
@@ -222,12 +227,20 @@ export function relieveOverlap(points, radii, { padding = 7, rounds = 60 } = {})
           dy = Math.sin(i * 2.39996);
           distance = 1;
         }
-        const push = ((wanted - distance) / distance / 2) * 0.6;
+        if (held(i) && held(j)) continue;
+        // When one end is held the other carries the whole separation, so the
+        // pair still parts by the same amount.
+        const share = held(i) || held(j) ? 1 : 0.5;
+        const push = ((wanted - distance) / distance) * share * 0.6;
         worst = Math.max(worst, wanted - distance);
-        moved[i].x -= dx * push;
-        moved[i].y -= dy * push;
-        moved[j].x += dx * push;
-        moved[j].y += dy * push;
+        if (!held(i)) {
+          moved[i].x -= dx * push;
+          moved[i].y -= dy * push;
+        }
+        if (!held(j)) {
+          moved[j].x += dx * push;
+          moved[j].y += dy * push;
+        }
       }
     if (worst < 0.25) break;
   }

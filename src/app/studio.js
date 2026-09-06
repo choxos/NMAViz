@@ -80,37 +80,33 @@ function shell() {
 
 /* ---- Controls -------------------------------------------------------------- */
 
-function renderControls() {
-  const node = document.querySelector("#controls");
-  const model = activeModel();
-  if (!model) {
-    node.innerHTML = "";
-    return;
-  }
-  const options = (selected) =>
-    model.treatments
-      .map(
-        (t) =>
-          `<option value="${escape(t)}"${t === selected ? " selected" : ""}>${escape(t)}</option>`
-      )
-      .join("");
+/* The controls are rebuilt only when their structure changes, never on every
+ * update.
+ *
+ * Replacing the markup takes the element out from under the pointer, and a
+ * range input whose node is replaced mid-gesture moves once and then stops
+ * following the mouse. So the panel is built when the treatments change and
+ * afterwards only synchronized: values written back, active pills marked, and
+ * the control the reader is currently holding left alone.
+ */
+let controlsKey = null;
 
-  const layoutPills = Object.entries(LAYOUTS)
-    .map(
-      ([id, l]) =>
-        `<button type="button" data-layout="${id}" class="${
-          state.layout === id ? "active" : ""
-        }">${l.label}</button>`
-    )
+function controlsMarkup(model) {
+  const options = model.treatments
+    .map((t) => `<option value="${escape(t)}">${escape(t)}</option>`)
     .join("");
 
-  node.innerHTML = `
+  const layoutPills = Object.entries(LAYOUTS)
+    .map(([id, l]) => `<button type="button" data-layout="${id}">${l.label}</button>`)
+    .join("");
+
+  return `
     <div class="control-block">
       <label class="control-label" for="treat1">Comparison of interest</label>
       <div class="contrast-picker">
-        <select id="treat1" aria-label="First treatment">${options(state.contrast?.treat1)}</select>
+        <select id="treat1" aria-label="First treatment">${options}</select>
         <button id="swap" type="button" title="Reverse the direction">${ICONS.swap}</button>
-        <select id="treat2" aria-label="Second treatment">${options(state.contrast?.treat2)}</select>
+        <select id="treat2" aria-label="Second treatment">${options}</select>
       </div>
     </div>
 
@@ -118,12 +114,8 @@ function renderControls() {
       <div class="control-block">
         <span class="control-label">Model</span>
         <div class="pills" id="model-pills">
-          <button type="button" data-model="common" class="${
-            state.model === "common" ? "active" : ""
-          }">Common effect</button>
-          <button type="button" data-model="random" class="${
-            state.model === "random" ? "active" : ""
-          }">Random effects</button>
+          <button type="button" data-model="common">Common effect</button>
+          <button type="button" data-model="random">Random effects</button>
         </div>
       </div>
     </div>
@@ -137,12 +129,68 @@ function renderControls() {
 
     <div class="control-block">
       <label class="control-label" for="separation">
-        Separation <output id="separation-value">${Math.round(state.separation * 100)}%</output>
+        Separation <output id="separation-value">0%</output>
       </label>
-      <input id="separation" type="range" min="0" max="1" step="0.01" value="${state.separation}" />
+      <input id="separation" type="range" min="0" max="1" step="0.01" value="0" />
       <p class="control-hint">Fan every comparison out into the individual studies behind it.</p>
     </div>
+
+    <p class="control-hint" id="drag-hint">
+      Drag a treatment to move it, or select one and use the arrow keys.
+    </p>
+
+    <div class="control-block" id="arrangement-state" hidden>
+      <p class="control-hint" id="arrangement-note"></p>
+      <button type="button" class="text-button" id="reset-arrangement">Put them back</button>
+    </div>
   `;
+}
+
+function renderControls() {
+  const node = document.querySelector("#controls");
+  const model = activeModel();
+  if (!model) {
+    node.innerHTML = "";
+    controlsKey = null;
+    return;
+  }
+
+  const key = `${state.dataset?.id}\u0000${model.treatments.join("\u0000")}`;
+  if (key !== controlsKey) {
+    controlsKey = key;
+    node.innerHTML = controlsMarkup(model);
+  }
+
+  const treat1 = node.querySelector("#treat1");
+  const treat2 = node.querySelector("#treat2");
+  if (treat1 && state.contrast) treat1.value = state.contrast.treat1;
+  if (treat2 && state.contrast) treat2.value = state.contrast.treat2;
+
+  node
+    .querySelectorAll("[data-model]")
+    .forEach((b) => b.classList.toggle("active", b.dataset.model === state.model));
+  node
+    .querySelectorAll("[data-layout]")
+    .forEach((b) => b.classList.toggle("active", b.dataset.layout === state.layout));
+
+  const separation = node.querySelector("#separation");
+  // Writing to the slider the reader is holding would fight their gesture.
+  if (separation && document.activeElement !== separation)
+    separation.value = String(state.separation);
+  const readout = node.querySelector("#separation-value");
+  if (readout) readout.textContent = `${Math.round(state.separation * 100)}%`;
+
+  const moved = Object.keys(state.pins).length;
+  const placedBlock = node.querySelector("#arrangement-state");
+  if (placedBlock) {
+    placedBlock.hidden = moved === 0;
+    const note = node.querySelector("#arrangement-note");
+    if (note)
+      note.textContent =
+        moved === 1
+          ? "One treatment is where you put it, not where the model put it."
+          : `${moved} treatments are where you put them, not where the model put them.`;
+  }
 }
 
 /* ---- Readouts -------------------------------------------------------------- */
@@ -170,16 +218,25 @@ function renderReadouts() {
 
 /* ---- Overlays: the data chooser and the about panel ------------------------ */
 
+/* The open panel is rebuilt only when what it says changes, for the same reason
+ * the controls are: an update that arrives while the reader is part way down a
+ * long panel should not throw away their scroll position or the control they
+ * are holding. */
+let overlayKey = null;
+
 function renderOverlay() {
   const node = document.querySelector("#overlay");
   if (!state.panel) {
     node.hidden = true;
     node.innerHTML = "";
+    overlayKey = null;
     return;
   }
+  const key = [state.panel, state.dataset?.id, state.dataset?.measure, state.error].join("\u0000");
+  if (key === overlayKey) return;
+  overlayKey = key;
   node.hidden = false;
-  node.innerHTML =
-    state.panel === "data" ? dataPanel() : aboutPanel();
+  node.innerHTML = state.panel === "data" ? dataPanel() : aboutPanel();
 }
 
 /* What was made of an uploaded file, and the one thing the file cannot say.
@@ -421,6 +478,19 @@ function layoutFor(model) {
   return cachedLayout;
 }
 
+/* The clear rectangle and the drawn positions of the last render, so a drag can
+ * be expressed in the same coordinates the drawing uses. */
+let lastBox = null;
+let lastPoints = null;
+
+function currentFraction(index) {
+  if (!lastBox || !lastPoints?.[index]) return { u: 0.5, v: 0.5 };
+  return {
+    u: (lastPoints[index].x - lastBox.left) / Math.max(1, lastBox.right - lastBox.left),
+    v: (lastPoints[index].y - lastBox.top) / Math.max(1, lastBox.bottom - lastBox.top),
+  };
+}
+
 function renderStage() {
   const stage = document.querySelector("#stage");
   const model = activeModel();
@@ -447,9 +517,26 @@ function renderStage() {
     bottom: wide ? height - 118 : Math.max(200, height * 0.36),
   };
   const framed = framedPoints(model, box);
+  // A treatment the reader has dragged goes exactly where they put it. The
+  // arrangement is a claim about standard errors, so moving a treatment by hand
+  // makes the claim less true rather than differently true: the stress under
+  // the title is recomputed on what is on screen, and it climbs as they push
+  // the drawing away from the geometry.
+  const held = new Set();
+  const placed = framed.points.map((point, i) => {
+    const pin = state.pins[model.treatments[i]];
+    if (!pin) return point;
+    held.add(i);
+    return {
+      x: box.left + pin.u * (box.right - box.left),
+      y: box.top + pin.v * (box.bottom - box.top),
+    };
+  });
   // Separate any treatments whose circles would sit on top of each other, then
   // measure how much that cost, so the caption describes this drawing.
-  const points = relieveOverlap(framed.points, nodeRadii(model));
+  const points = relieveOverlap(placed, nodeRadii(model), { fixed: held });
+  lastBox = box;
+  lastPoints = points;
   const meta =
     framed.meta.stress == null
       ? framed.meta
@@ -468,6 +555,7 @@ function renderStage() {
     // The clear rectangle the panels leave behind, so a label can be turned
     // back inward rather than sliding under the inspector.
     box,
+    pinned: held,
     measure: state.dataset?.measure ?? "MD",
     dataset: state.dataset,
   };
@@ -544,6 +632,126 @@ async function loadFile(file) {
   }
 }
 
+/* ---- Dragging a treatment -------------------------------------------------
+ *
+ * The arrangement is a claim, not a picture, so a treatment moved by hand does
+ * not silently become the new truth: it is recorded as a pin, the stress under
+ * the title is recomputed on the drawing that results, and one button puts
+ * everything back where the model wanted it.
+ *
+ * Only the node under the pointer moves. Relaxing the rest of the network
+ * around a dragged treatment would be more faithful to the geometry and much
+ * worse to use, because the drawing would keep sliding out from under the hand
+ * that is arranging it.
+ */
+
+let dragging = null;
+let dragFrame = null;
+
+/* Where a pointer is, as a fraction of the clear rectangle. */
+function boxFraction(event) {
+  const stage = document.querySelector("#stage");
+  const rect = stage.getBoundingClientRect();
+  const box = lastBox;
+  if (!box) return null;
+  const x = ((event.clientX - rect.left) / rect.width) * stage.clientWidth;
+  const y = ((event.clientY - rect.top) / rect.height) * stage.clientHeight;
+  return {
+    u: (x - box.left) / Math.max(1, box.right - box.left),
+    v: (y - box.top) / Math.max(1, box.bottom - box.top),
+  };
+}
+
+const clampPin = (pin) => ({
+  // A treatment can be pushed a little past the clear rectangle but not off the
+  // canvas, where it could not be picked up again.
+  u: Math.min(1.06, Math.max(-0.06, pin.u)),
+  v: Math.min(1.06, Math.max(-0.06, pin.v)),
+});
+
+function draggableLens() {
+  return Boolean(LENSES.find((l) => l.id === state.lens)?.spatial);
+}
+
+/* Redraw at most once a frame while a treatment is being carried. */
+function scheduleDragRender() {
+  if (dragFrame) return;
+  dragFrame = requestAnimationFrame(() => {
+    dragFrame = null;
+    renderStage();
+    renderControls();
+  });
+}
+
+function startDrag(event) {
+  if (event.button !== 0 && event.pointerType === "mouse") return;
+  if (!draggableLens()) return;
+  const node = event.target.closest("[data-treatment]");
+  if (!node) return;
+  const at = boxFraction(event);
+  if (!at) return;
+
+  const treatment = node.dataset.treatment;
+  const model = activeModel();
+  const index = model?.index.get(treatment);
+  if (index == null) return;
+
+  // Where the treatment is now, so the drag carries it from where it was
+  // grabbed rather than jumping its center to the pointer.
+  const current = state.pins[treatment] ?? currentFraction(index);
+  dragging = {
+    treatment,
+    origin: current,
+    grabbed: { u: at.u - current.u, v: at.v - current.v },
+    moved: false,
+    pointerId: event.pointerId,
+  };
+  // Capture keeps the drag alive when the pointer outruns the small circle. It
+  // is not available for every pointer, so a refusal is not a failed drag.
+  try {
+    node.setPointerCapture?.(event.pointerId);
+  } catch {
+    /* carry on without capture */
+  }
+  document.querySelector("#stage").classList.add("dragging");
+}
+
+function moveDrag(event) {
+  if (!dragging || event.pointerId !== dragging.pointerId) return;
+  const at = boxFraction(event);
+  if (!at) return;
+  const pin = clampPin({ u: at.u - dragging.grabbed.u, v: at.v - dragging.grabbed.v });
+  // A press that never travels is a click, and a click selects rather than
+  // rearranges.
+  if (!dragging.moved) {
+    const { origin } = dragging;
+    if (Math.hypot(pin.u - origin.u, pin.v - origin.v) < 0.004) return;
+    dragging.moved = true;
+  }
+  state.pins = { ...state.pins, [dragging.treatment]: pin };
+  scheduleDragRender();
+}
+
+function endDrag(event) {
+  if (!dragging || (event && event.pointerId !== dragging.pointerId)) return;
+  const moved = dragging.moved;
+  dragging = null;
+  document.querySelector("#stage").classList.remove("dragging");
+  if (!moved) return;
+
+  // A press that travelled is a rearrangement, so the click that ends it must
+  // not also change the comparison of interest. The guard is armed for exactly
+  // one click and drops itself shortly after either way, so a drag released
+  // outside the window cannot leave it armed against some later click.
+  const swallow = (click) => {
+    click.stopPropagation();
+    click.preventDefault();
+  };
+  window.addEventListener("click", swallow, { capture: true, once: true });
+  setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 400);
+  update({});
+}
+
 function wire() {
   const app = document.querySelector("#app");
 
@@ -579,6 +787,8 @@ function wire() {
 
     // Clicking a node or an edge on the canvas selects it; clicking a pair of
     // nodes in turn sets the comparison of interest.
+    if (event.target.closest("#reset-arrangement")) return update({ pins: {} });
+
     const node = event.target.closest("[data-treatment]");
     if (node) return chooseTreatment(node.dataset.treatment);
 
@@ -620,6 +830,14 @@ function wire() {
     }
   });
 
+  const stage = document.querySelector("#stage");
+  stage.addEventListener("pointerdown", startDrag);
+  stage.addEventListener("pointermove", moveDrag);
+  stage.addEventListener("pointerup", endDrag);
+  stage.addEventListener("pointercancel", endDrag);
+  // A pointer released outside the canvas still ends the drag.
+  window.addEventListener("pointerup", endDrag);
+
   const drop = () => document.querySelector("#file-drop");
   app.addEventListener("dragover", (event) => {
     if (!drop()?.contains(event.target)) return;
@@ -637,10 +855,46 @@ function wire() {
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") update({ panel: null, selection: null, error: null });
+    if (event.key === "Escape") return update({ panel: null, selection: null, error: null });
+    if (nudgeSelected(event)) event.preventDefault();
   });
 
   addEventListener("resize", () => renderStage());
+}
+
+/* Arrow keys move the selected treatment, so the arrangement can be changed
+ * without a pointer. The step is a share of the clear rectangle rather than a
+ * count of pixels, so it means the same thing on any window. */
+const ARROWS = {
+  ArrowLeft: { u: -1, v: 0 },
+  ArrowRight: { u: 1, v: 0 },
+  ArrowUp: { u: 0, v: -1 },
+  ArrowDown: { u: 0, v: 1 },
+};
+
+function nudgeSelected(event) {
+  const step = ARROWS[event.key];
+  if (!step || event.metaKey || event.ctrlKey || event.altKey) return false;
+  if (state.selection?.kind !== "treatment") return false;
+  if (!draggableLens()) return false;
+  // Not while the reader is in a menu, a slider or a text field.
+  const active = document.activeElement;
+  if (active && active !== document.body && active.closest("#controls, #overlay")) return false;
+
+  const treatment = state.selection.id;
+  const model = activeModel();
+  const index = model?.index.get(treatment);
+  if (index == null) return false;
+
+  const size = event.shiftKey ? 0.05 : 0.01;
+  const at = state.pins[treatment] ?? currentFraction(index);
+  update({
+    pins: {
+      ...state.pins,
+      [treatment]: clampPin({ u: at.u + step.u * size, v: at.v + step.v * size }),
+    },
+  });
+  return true;
 }
 
 /* Clicking treatments in turn walks the comparison of interest along: the

@@ -110,6 +110,9 @@ function inspector(context, step, partials) {
 }
 
 export const diffusionLens = {
+  // Draws the treatments where the shared arrangement puts them, so the
+  // reader can pick one up and move it.
+  spatial: true,
   id: "diffusion",
   name: "Diffusion",
   tagline: "How far the evidence had to travel to explain the uncertainty",

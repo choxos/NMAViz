@@ -122,8 +122,11 @@ export function drawNodes(context, { emphasis = new Map(), radii } = {}) {
       const point = points[i];
       const role = emphasis.get(name) ?? "";
       const selected = state.selection?.kind === "treatment" && state.selection.id === name;
+      const pinned = context.pinned?.has(i) ? " pinned" : "";
       return `
-        <g class="node ${role}${selected ? " selected" : ""}" data-treatment="${escape(name)}">
+        <g class="node ${role}${selected ? " selected" : ""}${pinned}" data-treatment="${escape(
+          name
+        )}">
           <title>${escape(name)}</title>
           <circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="${sizes[i].toFixed(1)}"/>
           ${labels.get(i) ?? ""}

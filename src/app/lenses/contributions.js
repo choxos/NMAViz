@@ -121,6 +121,9 @@ function inspector(context, shortest, walk) {
 }
 
 export const contributions = {
+  // Draws the treatments where the shared arrangement puts them, so the
+  // reader can pick one up and move it.
+  spatial: true,
   id: "contributions",
   name: "Contributions",
   tagline: "Which comparisons, and which trials, the estimate rests on",

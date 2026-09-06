@@ -148,6 +148,9 @@ function inspector(context) {
 }
 
 export const network = {
+  // Draws the treatments where the shared arrangement puts them, so the
+  // reader can pick one up and move it.
+  spatial: true,
   id: "network",
   name: "Network",
   tagline: "Every comparison, with the studies behind it",
