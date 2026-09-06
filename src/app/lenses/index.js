@@ -12,5 +12,15 @@ import { diffusionLens } from "./diffusion.js";
 import { springs } from "./springs.js";
 import { hodgeLens } from "./hodge.js";
 import { reconstruction } from "./reconstruction.js";
+import { bipartite } from "./bipartite.js";
 
-export const LENSES = [network, flow, contributions, reconstruction, diffusionLens, springs, hodgeLens];
+export const LENSES = [
+  network,
+  bipartite,
+  flow,
+  contributions,
+  reconstruction,
+  hodgeLens,
+  diffusionLens,
+  springs,
+];
