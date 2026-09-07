@@ -87,6 +87,11 @@ body {
   position: relative;
   flex: 0 0 auto;
   height: min(92vh, 1000px);
+  /* The keys, the deck and the decals do not fold up, so under about this the
+     only thing left to take space from is the glass. A machine that runs off
+     the bottom of a short window is worth more than one whose screen has been
+     squeezed shut, so the page scrolls instead. */
+  min-height: 690px;
   /* Wider than the photographed unit, and deliberately. A 1:1.6 body on a
      laptop screen leaves a play field barely 280px across, and the network is
      the thing this machine is for. */
@@ -94,7 +99,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: clamp(3px, 0.6vh, 9px);
-  padding: clamp(10px, 1.6vh, 20px) clamp(10px, 1.5vw, 22px) clamp(8px, 1.2vh, 16px);
+  /* The sides never go under 16px, because the lightning decals are printed
+     15px out from the glass and have to land on plastic. */
+  padding: clamp(10px, 1.6vh, 20px) clamp(16px, 1.5vw, 22px) clamp(8px, 1.2vh, 16px);
   border-radius: 34px 34px 44px 44px;
   color: var(--shell-print);
   background:
@@ -164,7 +171,7 @@ body {
 .screen-house {
   position: relative;
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 210px;
   display: flex;
   padding: clamp(8px, 1.1vh, 14px);
   border-radius: 12px;
@@ -777,9 +784,10 @@ body {
 
 .manual-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
   padding-bottom: 10px;
   border-bottom: 2px solid var(--ink);
 }
@@ -796,6 +804,7 @@ body {
 .manual-tabs {
   display: flex;
   gap: 6px;
+  margin-left: auto;
 }
 
 .tab {
@@ -882,8 +891,11 @@ body {
     height: min(88vh, 900px);
   }
 
+  /* Stretched, the sheet takes the cross axis start rather than the middle,
+     and sits to the left of the machine it belongs to. */
   .manual {
     flex: 0 0 auto;
+    align-self: center;
     width: min(560px, 100%);
     max-height: none;
     overflow: visible;
@@ -905,6 +917,93 @@ body {
 
   .bolt {
     display: none;
+  }
+
+  /* The deck is silkscreened across a body 420px wide at most, and some of the
+     readings it labels are whole phrases. They wrap here rather than printing
+     off the side of the machine. */
+  .console-label {
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+/* ---- A finger ------------------------------------------------------------- */
+
+/* Everything on this machine is sized off the window height, which on a phone
+   or a tablet comes out well under what a thumb can hit: a pad arm of 19px and
+   round keys of 15px. The question is not how wide the window is but what is
+   pointing at it, so this asks that instead. The caps grow to something you
+   can see, and each one takes a margin of hit area past its own edge, so the
+   target is bigger than the cap without the cap looking swollen. */
+@media (pointer: coarse) {
+  .dpad {
+    width: 108px;
+    height: 108px;
+  }
+
+  .key.pad::after,
+  .key.round::after {
+    content: "";
+    position: absolute;
+    inset: -7px;
+  }
+
+  .key.round {
+    position: relative;
+    width: 30px;
+    height: 30px;
+  }
+
+  .functions {
+    gap: clamp(16px, 5.5vw, 30px);
+  }
+
+  .game-key {
+    min-height: 42px;
+    justify-content: center;
+  }
+
+  .tab {
+    min-height: 40px;
+  }
+
+  .tab.square {
+    min-width: 40px;
+    justify-content: center;
+  }
+
+  /* The deck under the glass, the sheet beside it and the sheets the tabs open:
+     same rule, every control that is pressed rather than read. */
+  .console button,
+  .view-tools button,
+  .manual button,
+  .manual select,
+  .overlay button,
+  .icon-button {
+    min-height: 40px;
+  }
+
+  .icon-button {
+    min-width: 40px;
+  }
+
+  .contrast-picker button {
+    min-width: 40px;
+  }
+
+  .controls input[type="range"] {
+    min-height: 40px;
+  }
+
+  /* Under 16px a phone browser zooms the page to fill the field, and the
+     drawing is left half off the screen when it zooms back out. The sheets the
+     Data and About tabs open are not inside the manual, and the one that takes
+     pasted data is all field. */
+  select,
+  input:not([type="range"]),
+  textarea {
+    font-size: 16px;
   }
 }
 

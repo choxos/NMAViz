@@ -199,10 +199,13 @@ export const springs = {
     // least. A row that will not fit is not drawn small, it is left out and
     // said to be left out, because a coil crushed into ten pixels is not a
     // spring and cannot be read as one.
-    const roomFor = Math.max(
-      1,
-      Math.floor(((box?.bottom ?? height) - Math.max(26, height * 0.08) - top) / 24) - rows.length - 1
-    );
+    // A row is a coil with its name written above it, and the name has to clear
+    // the coil of the row before it: 36px is what that takes, where the old
+    // budget of 24 was the coil alone, which is why the names were printed
+    // across the springs above them. The rows are pinned at both ends of the
+    // band, so n of them span n - 1 gaps and not n.
+    const band = (box?.bottom ?? height) - Math.max(26, height * 0.08) - top;
+    const roomFor = Math.max(1, Math.floor(band / 36) - rows.length);
     const shownRoutes = routes.slice(0, Math.max(0, roomFor));
     shownRoutes.forEach((route) =>
       rows.push({
@@ -221,22 +224,23 @@ export const springs = {
       seTE: model.seTE[a][b],
     });
 
-    const floor = (box?.bottom ?? height) - Math.max(26, height * 0.08);
-    const gap = Math.min(54, (floor - top) / Math.max(1, rows.length));
+    const gap = Math.min(54, band / Math.max(1, rows.length - 1));
+    // Where the last coil sits, and so where the axis and its labels go.
+    const lastRow = top + (rows.length - 1) * gap;
     const nullAt = at(0);
 
     const axis = `
       <g class="spring-axis">
         <line x1="${nullAt}" y1="${top - 34}" x2="${nullAt}" y2="${
-          top + rows.length * gap + 10
+          lastRow + 10
         }"/>
         <text x="${nullAt}" y="${top - 42}" text-anchor="middle">${
           isRatio(measure) ? "1" : "0"
         }, no difference</text>
-        <text x="${left}" y="${top + rows.length * gap + 34}" text-anchor="start">${escape(
+        <text x="${left}" y="${lastRow + 34}" text-anchor="start">${escape(
           treat1
         )} lower</text>
-        <text x="${right}" y="${top + rows.length * gap + 34}" text-anchor="end">${escape(
+        <text x="${right}" y="${lastRow + 34}" text-anchor="end">${escape(
           treat1
         )} higher</text>
       </g>`;
@@ -369,16 +373,16 @@ export const springs = {
         <g class="wager${wager.settled ? " settled" : ""}">
           <line class="wager-stop" data-prop="wager" x1="${at(wager.guess).toFixed(1)}" y1="${
             top - 46
-          }" x2="${at(wager.guess).toFixed(1)}" y2="${top + rows.length * gap + 16}"/>
+          }" x2="${at(wager.guess).toFixed(1)}" y2="${lastRow + 16}"/>
           <text class="wager-label" x="${at(wager.guess).toFixed(1)}" y="${top - 54}"
             text-anchor="middle">${wager.settled ? "you said" : "your guess"}</text>
           ${
             wager.settled
               ? `<line class="wager-truth" x1="${at(rig.equilibrium).toFixed(1)}" y1="${
                   top - 46
-                }" x2="${at(rig.equilibrium).toFixed(1)}" y2="${top + rows.length * gap + 16}"/>
+                }" x2="${at(rig.equilibrium).toFixed(1)}" y2="${lastRow + 16}"/>
                  <text class="wager-label truth" x="${at(rig.equilibrium).toFixed(1)}" y="${
-                   top + rows.length * gap + 30
+                   lastRow + 30
                  }" text-anchor="middle">it rests here</text>`
               : ""
           }

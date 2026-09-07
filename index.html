@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f3f4f4" />
+    <meta name="theme-color" content="#cfccc4" />
     <meta name="color-scheme" content="light dark" />
     <meta
       name="description"
@@ -13,15 +13,16 @@
   </head>
   <body>
     <script>
-      // Resolve the theme before the first paint, so a dark mode reader never
-      // sees a white flash. The stored choice wins; otherwise follow the system.
+      // Resolve the theme before the first paint, so nobody sees the palette
+      // change under them. The stored choice wins; otherwise the paper theme,
+      // which is the one the machine is drawn in and the default on purpose
+      // rather than by whatever the system happens to be set to.
       (() => {
         let theme;
         try {
           theme = localStorage.getItem("nmaviz-theme");
         } catch {}
-        if (!["dark", "light", "mono", "arcade"].includes(theme))
-          theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        if (!["dark", "light", "mono", "arcade"].includes(theme)) theme = "light";
         document.documentElement.dataset.theme = theme;
       })();
     </script>

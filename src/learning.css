@@ -50,12 +50,23 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .inspector summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
 #population-data { width: 100%; min-height: 180px; font-family: ui-monospace, monospace; font-size: 11px; }
 @media (max-width: 640px) {
-  .lcd-body:not(.enlarged) { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(330px, 1fr) auto; }
-  .lcd-body:not(.enlarged) .readouts {
+  /* On a phone the readouts cannot have a column of their own, so they run
+     under the drawing as a row. Enlarging means a taller screen and not a wider
+     one: the glass is as wide as the phone either way, and the 680px column the
+     wide layout uses would only push half the network off it. */
+  .lcd-body,
+  .lcd-body.enlarged { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(330px, 1fr) auto; }
+  .lcd-body.enlarged { overflow: visible; }
+  .lcd-body.enlarged .stage { min-height: min(70vh, 560px); }
+  .lcd-body .readouts {
     grid-column: 1; grid-row: 2; flex-direction: row; flex-wrap: wrap;
     justify-content: space-between; border-left: 0; border-top: 1px solid var(--line); padding: 8px 0 0;
   }
-  .lcd-body:not(.enlarged) .readouts dd { font-size: 11px; }
+  .lcd-body .readouts dd { font-size: 11px; }
+  /* The cells of a proportion have no text to hold them open, so on the row
+     they would be squeezed to nothing and the reading would go missing while
+     its label stayed. */
+  .lcd-body .readouts .lcd-bar { min-width: 44px; }
   .practice-entry { flex-wrap: wrap; }
-  .manual button { min-height: 36px; }
+  .manual button { min-height: 40px; }
 }

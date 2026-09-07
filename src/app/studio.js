@@ -695,7 +695,10 @@ function renderStage() {
   // screen rather than a card on top of it. So the clear rectangle is the glass
   // itself, less the room a treatment's label needs under its circle and the
   // room the source branch needs to bow into.
-  const margin = Math.max(16, Math.min(34, width * 0.05));
+  // The floor is the biggest circle a treatment is drawn as, plus the ring a
+  // lens may put around it: at 16 the leftmost node had its outline shaved off
+  // by the edge of the glass on a phone.
+  const margin = Math.max(24, Math.min(34, width * 0.05));
   // A game that draws something standing above a treatment, such as the pipette
   // the walk is released from, needs the room for it inside the glass.
   const headroom = LENSES.find((entry) => entry.id === state.lens)?.headroom ?? 0;

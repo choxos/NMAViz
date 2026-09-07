@@ -15,15 +15,21 @@
 import { studyContributions } from "../../nma/projection.js";
 import { effect, escape, isRatio, number, onScale, percent, shortLabel } from "../ui.js";
 
-function tensionRow(label, estimate, seTE, measure, x, scale, y, emphasis = "") {
+/* The label hangs from the left end of the interval, which on a narrow panel
+ * puts the end of it past the right edge of the drawing. There is no measuring
+ * of text here, so the width is estimated from the count of characters at the
+ * size the stylesheet sets, and the label is pushed back until it fits. */
+function tensionRow(label, estimate, seTE, measure, x, bounds, y, emphasis = "") {
   if (!Number.isFinite(estimate)) return "";
   const lower = x(estimate - 1.96 * seTE);
   const upper = x(estimate + 1.96 * seTE);
+  const printed = label.length * 5.8;
+  const at = Math.max(4, Math.min(lower, bounds.right - printed));
   return `
     <g class="tension ${emphasis}">
       <line x1="${lower.toFixed(1)}" y1="${y}" x2="${upper.toFixed(1)}" y2="${y}"/>
       <circle cx="${x(estimate).toFixed(1)}" cy="${y}" r="5"/>
-      <text x="${lower.toFixed(1)}" y="${y - 12}">${escape(label)}</text>
+      <text x="${at.toFixed(1)}" y="${y - 12}">${escape(label)}</text>
     </g>`;
 }
 
@@ -51,8 +57,11 @@ export const reconstruction = {
     // what is left above it. On a short panel the block is given a share rather
     // than a fixed 208 pixels, which used to leave it above the first bar.
     const tensionTop = height - Math.max(96, Math.min(208, height * 0.3));
-    const available = Math.max(120, tensionTop - top - 70);
-    const capacity = Math.max(5, Math.min(18, Math.floor(available / 26)));
+    // What is actually left between the top of the walk and the tension block,
+    // not a floor of 120 that the panel may not have: claiming space that is
+    // not there is what put the caption across the first tension label.
+    const available = Math.max(60, tensionTop - top - 70);
+    const capacity = Math.max(3, Math.min(18, Math.floor(available / 26)));
     const shown = projection.studies.slice(0, capacity);
     const rest = projection.studies.slice(capacity);
     const restTotal = rest.reduce((s, r) => s + r.contribution, 0);
@@ -92,6 +101,9 @@ export const reconstruction = {
 
     const gap = Math.min(28, available / Math.max(1, walk.length));
     const zero = x(0);
+    // The names end where the bars begin, so what fits is whatever the column
+    // to the left of that holds at the size the stylesheet sets.
+    const nameRoom = Math.max(6, Math.floor((left - 14) / 5.6));
 
     const bars = walk
       .map((step, index) => {
@@ -110,13 +122,20 @@ export const reconstruction = {
             )}" y2="${y}"/>
             <rect x="${Math.min(from, to).toFixed(1)}" y="${(y - 6).toFixed(1)}"
               width="${Math.max(1.4, Math.abs(to - from)).toFixed(1)}" height="12" rx="2.5"/>
-            <text class="waterfall-label" x="${labelColumn}" y="${y}"
-              dominant-baseline="middle">${escape(shortLabel(step.label, 20))}</text>
+            <text class="waterfall-label" x="${(left - 10).toFixed(1)}" y="${y}"
+              dominant-baseline="middle">${escape(shortLabel(step.label, nameRoom))}</text>
           </g>`;
       })
       .join("");
 
     const finalY = top + walk.length * gap + 24;
+    // The caption belongs under the last bar of the walk, but a panel short
+    // enough that the bars and the tension plot are competing for the same
+    // band would otherwise print it across the first tension label.
+    const captionY = Math.max(
+      top + (walk.length - 1) * gap + 22,
+      Math.min(finalY + 30, tensionTop - 24)
+    );
 
     // A caption centered on the total runs off the drawing when the total sits
     // near one end of the axis, which on a panel means the last few characters
@@ -130,7 +149,7 @@ export const reconstruction = {
 
     const axis = `
       <g class="spring-axis">
-        <line x1="${zero}" y1="${top - 26}" x2="${zero}" y2="${finalY + 42}"/>
+        <line x1="${zero}" y1="${top - 26}" x2="${zero}" y2="${(captionY + 12).toFixed(1)}"/>
         <text x="${zero}" y="${top - 34}" text-anchor="middle">${
           isRatio(measure) ? "1" : "0"
         }, where the walk starts</text>
@@ -138,8 +157,8 @@ export const reconstruction = {
       <g class="waterfall-total">
         <line x1="${x(estimate).toFixed(1)}" y1="${top - 20}" x2="${x(estimate).toFixed(
           1
-        )}" y2="${finalY + 10}"/>
-        <text x="${totalLabelAt.toFixed(1)}" y="${finalY + 30}" text-anchor="${
+        )}" y2="${(captionY - 20).toFixed(1)}"/>
+        <text x="${totalLabelAt.toFixed(1)}" y="${captionY.toFixed(1)}" text-anchor="${
           totalLabelAnchor
         }">the network estimate, ${scaleLabel(estimate)}</text>
       </g>`;
@@ -169,7 +188,7 @@ export const reconstruction = {
         projection.direct.seTE,
         measure,
         tx,
-        null,
+        { left, right },
         tensionTop
       )}
       ${tensionRow(
@@ -178,7 +197,7 @@ export const reconstruction = {
         projection.indirect.seTE,
         measure,
         tx,
-        null,
+        { left, right },
         tensionTop + tensionGap
       )}
       ${tensionRow(
@@ -187,7 +206,7 @@ export const reconstruction = {
         model.seTE[model.index.get(treat1)][model.index.get(treat2)],
         measure,
         tx,
-        null,
+        { left, right },
         tensionTop + 2 * tensionGap,
         "network"
       )}`;

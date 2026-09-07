@@ -152,6 +152,19 @@
   cursor: grab;
 }
 
+/* A finger that lands on something draggable is dragging it, not scrolling the
+   page. Only the things that can actually be carried claim the gesture, so a
+   finger on empty canvas still scrolls the sheet under it. */
+#stage [data-treatment],
+#stage [data-prop],
+#stage [data-bob] {
+  touch-action: none;
+  /* A press held long enough to be a drag is a drag, not a request to select
+     the label under it. */
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 #stage.dragging,
 #stage.dragging [data-treatment] {
   cursor: grabbing;
@@ -313,8 +326,11 @@
   height: 15px;
 }
 
+/* A segmented control, and it wraps: a set of options too wide for the panel
+   would otherwise run off the side of it rather than take a second line. */
 .pills {
   display: flex;
+  flex-wrap: wrap;
   gap: 3px;
   padding: 3px;
   background: var(--wash);
@@ -1306,9 +1322,9 @@ input[type="range"] {
     max-width: none;
   }
 
-  /* The comparison of interest drives every lens, so it stays on screen; the
-     arrangement, the model and the separation move into a details panel that
-     is closed by default. */
+  /* Every control the wide window has, the narrow one has too: a setting that
+     only exists on a big screen is a setting that quietly changes what the
+     reader is looking at. */
   .controls {
     left: 10px;
     right: 10px;
@@ -1316,11 +1332,6 @@ input[type="range"] {
     width: auto;
     padding: 12px;
     gap: 10px;
-  }
-
-  .controls .control-row,
-  .controls .control-block:last-child {
-    display: none;
   }
 
   .inspector {
@@ -1360,11 +1371,6 @@ input[type="range"] {
   }
 }
 
-@media (max-width: 560px) {
-  .readouts div:nth-child(n + 5) {
-    display: none;
-  }
-}
 
 /* ---- Flow lens ------------------------------------------------------------- */
 
@@ -1842,10 +1848,12 @@ input[type="range"] {
   stroke-dasharray: 2 3;
 }
 
+/* The name ends where the bars begin, so it grows into the empty column on the
+   left rather than across the bar it belongs to. */
 .waterfall-label {
   font-size: 10.5px;
   fill: var(--muted);
-  text-anchor: start;
+  text-anchor: end;
 }
 
 .waterfall-total line {

@@ -95,8 +95,18 @@ function sensitivityPanel(context, check) {
 
 /* Where excluded trials sit. Bottom left of the clear area, out of the way of
  * the network and never over it. */
+/* What the tray says it is for, and how wide the saying of it is at the size
+ * the stylesheet prints it: an uppercase 10px face at 0.08em runs about 7px to
+ * the character. The long prompt is only used where the tray can hold it,
+ * because a label wider than its own box is a label printed across the
+ * network beside it. */
+const TRAY_PROMPTS = [
+  { text: "Drag a trial here", room: 143 },
+  { text: "Leave out", room: 0 },
+];
+
 function trayBox(box) {
-  const width = Math.min(300, (box.right - box.left) * 0.42);
+  const width = Math.min(300, Math.max(120, (box.right - box.left) * 0.42));
   const height = 78;
   return { x: box.left + 4, y: box.bottom - height, width, height };
 }
@@ -239,7 +249,7 @@ export const bipartite = {
         <text class="tray-label" x="${tray.x + 12}" y="${tray.y + 15}">${
           left.size
             ? `Left out: ${left.size} ${left.size === 1 ? "trial" : "trials"}`
-            : "Drag a trial here to leave it out"
+            : TRAY_PROMPTS.find((prompt) => tray.width >= prompt.room).text
         }</text>
         ${shelved}
       </g>`;
