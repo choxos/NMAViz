@@ -23,11 +23,33 @@ export function nodeWeights(model) {
   return counts;
 }
 
+/* How big a treatment is drawn depends on how big the drawing is.
+ *
+ * The radii used to be fixed in pixels because the canvas was the window. It is
+ * now a panel a few hundred pixels across, and a 24px circle on a 280px field
+ * is a blob rather than a treatment. The scale is set once per draw from the
+ * clear rectangle, and it is a module-level value rather than an argument
+ * because every lens asks for radii and none of them should have to care.
+ */
+let radiusScale = 1;
+
+/* The width a drawing has to have before the radii stop shrinking. Below it the
+ * circles come down with the canvas; above it they stay put, because a bigger
+ * window is more room for the network and not a reason to draw fatter dots. */
+const FULL_SIZE = 620;
+
+export function setDrawScale(box) {
+  const span = Math.min(box.right - box.left, box.bottom - box.top);
+  radiusScale = Math.max(0.5, Math.min(1, span / FULL_SIZE));
+}
+
 export function nodeRadii(model) {
   const counts = nodeWeights(model);
   const min = Math.min(...counts);
   const max = Math.max(...counts);
-  return counts.map((c) => scaleBetween(Math.sqrt(c), Math.sqrt(min), Math.sqrt(max), 9, 24));
+  return counts.map(
+    (c) => scaleBetween(Math.sqrt(c), Math.sqrt(min), Math.sqrt(max), 9, 24) * radiusScale
+  );
 }
 
 /* A label placed outside its node, pushed away from the middle of the canvas so

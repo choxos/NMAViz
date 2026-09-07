@@ -12,8 +12,9 @@ import { LAYOUTS, frame, relieveOverlap, stressOf } from "./layout.js";
 import { describe, tipMarkup } from "./tips.js";
 import { makeRig, releaseFrom, stepRig } from "./play.js";
 import { LENSES } from "./lenses/index.js";
-import { nodeRadii, separable } from "./lenses/draw.js";
-import { activeModel, load, setExcluded, state, subscribe, update } from "./state.js";
+import { nodeRadii, separable, setDrawScale } from "./lenses/draw.js";
+import { activeModel, directEdge, load, setExcluded, state, subscribe, update } from "./state.js";
+import { beep, setSound, soundIsOn } from "./sound.js";
 import { ICONS, escape, number, percent, shortLabel } from "./ui.js";
 import examples from "../data/examples.json";
 import { readNetwork, MEASURES } from "../nma/parse.js";
@@ -53,45 +54,110 @@ function setTheme(theme) {
 /* ---- The shell, written once ---------------------------------------------- */
 
 function shell() {
+  // The lenses are the games on the cartridge, so they are numbered the way a
+  // machine like this numbers them, and the number is printed on the button.
   const lensButtons = LENSES.map(
-    (lens) => `
-      <button class="lens-button" type="button" data-lens="${lens.id}"
+    (lens, index) => `
+      <button class="game-key" type="button" data-lens="${lens.id}"
         aria-label="${escape(lens.name)}" title="${escape(lens.name)}. ${escape(lens.tagline)}">
-        ${lens.mark}<span>${escape(lens.name)}</span>
+        <span class="game-key-number">${String(index + 1).padStart(2, "0")}</span>
+        <span class="game-key-name">${escape(lens.name)}</span>
       </button>`
   ).join("");
 
+  const functionKeys = [
+    ["power", "ON/OFF", "Cut the power to the machine"],
+    ["sound", "SOUND", "Blips on and off"],
+    ["play", "S/P", "Start and pause whatever this game runs"],
+    ["reset", "RESET", "Put everything back where it started"],
+  ]
+    .map(
+      ([id, label, title]) => `
+        <div class="function">
+          <button type="button" class="key round" data-key="${id}" title="${escape(title)}"
+            aria-label="${escape(label)}"></button>
+          <span class="key-label">${label}</span>
+        </div>`
+    )
+    .join("");
+
+  const pad = ["up", "left", "right", "down"]
+    .map(
+      (way) =>
+        `<button type="button" class="key pad ${way}" data-pad="${way}"
+           aria-label="Move ${way}"></button>`
+    )
+    .join("");
+
   return `
-    <div class="studio">
-      <svg class="stage" id="stage" aria-label="Network diagram"></svg>
-      <div class="vignette"></div>
+    <div class="bench">
+      <div class="handheld" id="handheld">
+        <div class="plate">
+          <span class="plate-mark">${ICONS.network}</span>
+          <span class="plate-word">NMA<span class="brand-light">Viz</span></span>
+        </div>
 
-      <div class="identity">
-        <a class="brand" href="./">
-          <span class="brand-mark">${ICONS.network}</span>
-          <span class="brand-word">NMA<span class="brand-light">Viz</span></span>
-        </a>
-        <span class="eyebrow"><span class="live-dot"></span><span id="dataset-name"></span></span>
-        <h1 id="lens-title"></h1>
-        <p id="lens-note"></p>
+        <div class="screen-house">
+          <span class="bolt left" aria-hidden="true"></span>
+          <span class="bolt right" aria-hidden="true"></span>
+          <div class="lcd">
+            <div class="lcd-head">
+              <span class="lcd-game" id="lens-title"></span>
+              <span class="lcd-cart" id="dataset-name"></span>
+            </div>
+            <div class="lcd-body">
+              <svg class="stage" id="stage" aria-label="Network diagram"></svg>
+              <div class="readouts" id="readouts"></div>
+            </div>
+            <div class="lcd-status" id="status"></div>
+            <div class="lcd-grid" aria-hidden="true"></div>
+            <div class="lcd-sheen" aria-hidden="true"></div>
+            <div class="vignette"></div>
+          </div>
+        </div>
+
+        <div class="console" id="console" hidden></div>
+
+        <div class="band">CLASSICAL</div>
+
+        <nav class="game-bar" id="lens-bar" aria-label="Game">${lensButtons}</nav>
+
+        <div class="functions">${functionKeys}</div>
+
+        <div class="pads">
+          <div class="dpad">${pad}<span class="dpad-hub" aria-hidden="true"></span></div>
+          <div class="action">
+            <button type="button" class="key big" data-key="rotate" aria-label="Rotate the arrangement"></button>
+            <span class="key-label">ROTATE</span>
+          </div>
+        </div>
+
+        <div class="decal">
+          <span class="decal-mouse" aria-hidden="true">${ICONS.network}</span>
+          <span class="decal-name">LAB MOUSE</span>
+          <span class="decal-title">NETWORK GAME</span>
+          <span class="decal-count">8&#8202;IN&#8202;1</span>
+        </div>
       </div>
 
-      <nav class="panel lens-bar" id="lens-bar" aria-label="Lens">${lensButtons}</nav>
-
-      <div class="top-actions">
-        <button id="data-button" class="panel icon-button" type="button" title="Choose or upload data">
-          ${ICONS.data}<span>Data</span>
-        </button>
-        <button id="about-button" class="panel icon-button" type="button" title="About this site">
-          ${ICONS.info}
-        </button>
-        <button id="theme-toggle" class="panel icon-button square" type="button"></button>
+      <div class="manual" id="manual">
+        <header class="manual-head">
+          <span class="manual-kicker">Instructions</span>
+          <div class="manual-tabs">
+            <button id="data-button" class="tab" type="button" title="Choose or upload data">
+              ${ICONS.data}<span>Data</span>
+            </button>
+            <button id="about-button" class="tab" type="button" title="About this site">
+              ${ICONS.info}<span>About</span>
+            </button>
+            <button id="theme-toggle" class="tab square" type="button"></button>
+          </div>
+        </header>
+        <p class="manual-note" id="lens-note"></p>
+        <aside class="controls" id="controls"></aside>
+        <aside class="inspector" id="inspector"></aside>
       </div>
 
-      <aside class="panel controls" id="controls"></aside>
-      <aside class="panel inspector" id="inspector"></aside>
-      <div class="panel console" id="console" hidden></div>
-      <div class="panel readouts" id="readouts"></div>
       <div class="overlay" id="overlay" hidden></div>
       <div class="tip" id="tip" role="tooltip" hidden></div>
     </div>
@@ -252,6 +318,19 @@ function renderControls() {
 
 /* ---- Readouts -------------------------------------------------------------- */
 
+/* The score column.
+ *
+ * The counters down the side of the glass. A count gets digits over the ghost
+ * of the unlit segments behind them, which is what a panel like this looks
+ * like; a proportion gets a bar of cells, because a bar is what a proportion
+ * is and no number of digits makes 81% easier to compare at a glance.
+ */
+const cells = (share, count = 10) =>
+  `<div class="lcd-bar">${Array.from(
+    { length: count },
+    (_, i) => `<i class="${i < Math.round(share * count) ? "lit" : ""}"></i>`
+  ).join("")}</div>`;
+
 function renderReadouts() {
   const node = document.querySelector("#readouts");
   const fit = state.fit;
@@ -259,18 +338,20 @@ function renderReadouts() {
     node.innerHTML = "";
     return;
   }
+  const digits = (value, ghost) =>
+    `<dd data-ghost="${ghost}">${escape(String(value))}</dd>`;
+
   const items = [
-    ["Treatments", fit.treatments.length],
-    ["Comparisons", fit.edges.length],
-    ["Studies", fit.studies.length],
-    ["Q", number(fit.Q, 1)],
-    ["df", number(fit.df, 1)],
-    ["I²", percent(fit.I2, 0)],
-    ["τ", number(fit.tau, 3)],
+    ["Treat", digits(fit.treatments.length, "88")],
+    ["Comp", digits(fit.edges.length, "88")],
+    ["Studies", digits(fit.studies.length, "88")],
+    // Q means nothing without the degrees of freedom it is being judged
+    // against, so they share a reading rather than a row each.
+    ["Q on df", digits(`${number(fit.Q, 1)}/${number(fit.df, 0)}`, "888.8/88")],
+    ["τ", digits(number(fit.tau, 3), "8.888")],
+    ["I²", cells(Math.max(0, Math.min(1, fit.I2)))],
   ];
-  node.innerHTML = items
-    .map(([label, value]) => `<div><dt>${label}</dt><dd>${value}</dd></div>`)
-    .join("");
+  node.innerHTML = items.map(([label, value]) => `<div><dt>${label}</dt>${value}</div>`).join("");
 }
 
 /* ---- Overlays: the data chooser and the about panel ------------------------ */
@@ -553,6 +634,11 @@ function renderStage() {
   const stage = document.querySelector("#stage");
   const model = activeModel();
   const inspector = document.querySelector("#inspector");
+
+  // The mains switch. A panel with no power behind it shows nothing but the
+  // words etched into the glass, which is exactly what these do.
+  document.querySelector(".lcd")?.classList.toggle("dark", state.power === false);
+  document.querySelector(".bench")?.classList.toggle("paused", Boolean(state.paused));
   if (!model) {
     stage.innerHTML = "";
     inspector.innerHTML = "";
@@ -563,25 +649,20 @@ function renderStage() {
   const height = stage.clientHeight || 800;
   stage.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
-  // Keep the network clear of the panels that float over it, so a treatment
-  // never sits underneath the inspector and its label never runs off the edge.
-  const wide = width > 900;
+  // The panels no longer float over the network: the settings and the tables
+  // are on the sheet beside the machine, and the counters are a column of the
+  // screen rather than a card on top of it. So the clear rectangle is the glass
+  // itself, less the room a treatment's label needs under its circle and the
+  // room the source branch needs to bow into.
+  const margin = Math.max(16, Math.min(34, width * 0.05));
   const box = {
-    left: wide ? 330 : 20,
-    right: wide ? width - 372 : width - 20,
-    top: wide ? 150 : 96,
-    // On a narrow window every panel is stacked along the bottom, so the
-    // network keeps the top of the screen to itself. A lens with a deck needs
-    // another band cleared for it, measured from the deck that is actually on
-    // screen rather than guessed: a deck that has wrapped to three rows needs
-    // more room than one that has not.
-    bottom: wide
-      ? height -
-        (LENSES.find((l) => l.id === state.lens)?.deck
-          ? 118 + (document.querySelector("#console")?.offsetHeight || 46) + 26
-          : 118)
-      : Math.max(200, height * 0.36),
+    left: margin,
+    right: width - margin,
+    top: margin,
+    bottom: height - margin - 12,
   };
+  // How big a treatment is drawn follows how much room the drawing has.
+  setDrawScale(box);
   const framed = framedPoints(model, box);
   // A treatment the reader has dragged goes exactly where they put it. The
   // arrangement is a claim about standard errors, so moving a treatment by hand
@@ -670,13 +751,57 @@ function renderStage() {
     deck.innerHTML = controls;
   }
   deck.hidden = !controls;
-  document.querySelector("#lens-title").textContent = lens.name;
+  const game = LENSES.findIndex((entry) => entry.id === lens.id) + 1;
+  document.querySelector("#lens-title").textContent = `Game ${String(game).padStart(2, "0")} ${
+    lens.name
+  }`;
   document.querySelector("#lens-note").textContent = drawn.note ?? lens.tagline;
   document.querySelector("#dataset-name").textContent = state.dataset?.name ?? "";
 
   document
-    .querySelectorAll(".lens-button")
+    .querySelectorAll(".game-key")
     .forEach((b) => b.classList.toggle("active", b.dataset.lens === state.lens));
+  renderStatus();
+}
+
+/* ---- The status words ------------------------------------------------------ */
+
+/* The words printed into the panel, lit when they hold.
+ *
+ * A real one of these has GAME OVER and SPEED LEVEL etched into the glass,
+ * visible faintly whether or not they apply. That is worth copying exactly,
+ * because the unlit words tell a reader the whole vocabulary of states the
+ * machine has. Every word here is a condition of the fit or of the machine, and
+ * none of them is decoration.
+ */
+function statusWords() {
+  const fit = state.fit;
+  const edge = state.contrast
+    ? directEdge(state.contrast.treat1, state.contrast.treat2)
+    : null;
+  return [
+    ["Power", state.power !== false],
+    ["Sound", soundIsOn()],
+    ["Random", state.model === "random"],
+    // Whether anything is actually driven around the network right now.
+    ["Open circuit", state.plug != null],
+    // No study compared these two directly, so everything shown is indirect.
+    ["Indirect only", Boolean(state.contrast) && !edge],
+    ["Heterogeneous", Boolean(fit) && fit.I2 > 0.5],
+    ["Moved", Object.keys(state.pins).length > 0],
+    ["Trial out", state.excluded.length > 0],
+  ];
+}
+
+function renderStatus() {
+  const node = document.querySelector("#status");
+  if (!node) return;
+  const markup = statusWords()
+    .map(([word, lit]) => `<span class="${lit ? "lit" : ""}">${escape(word)}</span>`)
+    .join("");
+  if (node.dataset.markup === markup) return;
+  node.dataset.markup = markup;
+  node.innerHTML = markup;
 }
 
 /* ---- Events ---------------------------------------------------------------- */
@@ -1246,8 +1371,122 @@ function endDrag(event) {
   update({});
 }
 
+/* ---- The keys -------------------------------------------------------------- */
+
+/* Every key on the shell moves something the model has.
+ *
+ * The rule the props on the canvas follow applies here too: a control that
+ * looks physical and changes nothing is worse than no control, so ON/OFF really
+ * cuts the power, S/P really starts and stops whatever this game runs, RESET
+ * really puts back everything a reader can move, and the pad and the big button
+ * really move and rearrange the network.
+ */
+function pressKey(id) {
+  if (id === "power") {
+    const on = state.power === false;
+    beep(on ? "power" : "off");
+    if (!on) stopRig();
+    return update({ power: on });
+  }
+  // With the power off the only key that answers is the one that turns it on.
+  if (state.power === false) return beep("deny");
+
+  beep("press");
+  if (id === "sound") {
+    setSound(!soundIsOn());
+    return update({});
+  }
+  if (id === "rotate") {
+    const ids = Object.keys(LAYOUTS);
+    return update({ layout: ids[(ids.indexOf(state.layout) + 1) % ids.length] });
+  }
+  if (id === "reset") {
+    // Everything a reader can knock out of place, and nothing they chose on
+    // purpose: the game, the data, the comparison and the model all stay.
+    update({ pins: {}, plug: null, wager: null, separation: 0, paused: false });
+    if (state.excluded.length) setExcluded([]);
+    return;
+  }
+  if (id === "play") return pressPlay();
+}
+
+/* Start and pause, meaning whatever this game actually runs. */
+function pressPlay() {
+  if (state.lens === "springs") {
+    if (!rig) return beep("deny");
+    if (rig.running) {
+      stopRig();
+      rig.running = false;
+      rig.v = 0;
+      renderStage();
+      return renderControls();
+    }
+    releaseFrom(rig, rig.equilibrium + rig.span * 0.9);
+    return runRig();
+  }
+  if (state.lens === "diffusion") {
+    // The walk is either running on its own clock or being held at a step.
+    const options = { ...state.options };
+    if (options.walk == null) options.walk = String(diffusionStep());
+    else delete options.walk;
+    return update({ options });
+  }
+  // Everywhere else what runs is the current sliding along the wires.
+  return update({ paused: !state.paused });
+}
+
+/* Which step the diffusion animation is showing right now.
+ *
+ * Pausing has to hold the picture the reader is looking at, so the step comes
+ * from the same frame counter the lens draws from rather than from a second
+ * clock that happens to run at a similar rate.
+ */
+function diffusionStep() {
+  const held = state.options.walk;
+  if (held != null) return Number(held);
+  return frameCount;
+}
+
+/* The pad moves the selected treatment, and when nothing is selected it picks
+ * one: on a machine with four directions and no pointer, the first press has to
+ * do something. */
+const PAD_KEYS = { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" };
+
+function pressPad(way) {
+  if (state.power === false) return beep("deny");
+  beep("press");
+  const model = activeModel();
+  if (!model) return;
+
+  if (state.selection?.kind !== "treatment") {
+    const start = state.contrast?.treat1 ?? model.treatments[0];
+    return update({ selection: { kind: "treatment", id: start } });
+  }
+
+  // Where the arrangement cannot be changed, left and right walk the selection
+  // along the treatments instead, which is the only way to travel the network
+  // with four keys.
+  if (!draggableLens()) {
+    if (way === "up" || way === "down") return;
+    const order = model.treatments;
+    const at = order.indexOf(state.selection.id);
+    const next = order[(at + (way === "right" ? 1 : order.length - 1)) % order.length];
+    return update({ selection: { kind: "treatment", id: next } });
+  }
+
+  nudgeSelected({ key: PAD_KEYS[way], shiftKey: false });
+  renderStage();
+}
+
 function wire() {
   const app = document.querySelector("#app");
+
+  app.addEventListener("click", (event) => {
+    const key = event.target.closest("[data-key]");
+    if (key) return pressKey(key.dataset.key);
+    const pad = event.target.closest("[data-pad]");
+    if (pad) return pressPad(pad.dataset.pad);
+  });
 
   app.addEventListener("click", (event) => {
     const lensButton = event.target.closest("[data-lens]");

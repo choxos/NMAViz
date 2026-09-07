@@ -1,0 +1,952 @@
+/* The machine.
+ *
+ * The site is a handheld: a black plastic body with a grey-green LCD set into
+ * it, four rubber function keys, a four-way pad, one big round button, and the
+ * printed decals such a thing always has. The reading matter that will not fit
+ * on a small screen sits beside it as the folded instruction sheet that came in
+ * the box.
+ *
+ * Two rules keep this from being a costume:
+ *
+ * 1. Nothing in the shell scales the canvas. Every pointer gesture on this site
+ *    reads the stage's own bounding box and divides by its client size, so an
+ *    ancestor with a transform would break dragging, the plug, the probes and
+ *    the springs at once. The body is sized in real units and the LCD is a real
+ *    element of a real size.
+ * 2. Every key does something the model actually has. A dead button in yellow
+ *    plastic is the same fault as a slider that moves and changes nothing.
+ *
+ * The plastic is the object and does not change with the theme. The theme is
+ * the screen: an unlit grey-green panel, a monochrome one, a backlit one, a
+ * phosphor one. The LCD redefines the drawing tokens inside itself, so the
+ * network is drawn in the screen's own ink without a single lens knowing.
+ */
+
+:root {
+  /* The body. A cheap injection moulding: near black, slightly warm, with the
+     gloss coming from one narrow highlight rather than from a big soft one. */
+  --shell: #17181b;
+  --shell-high: #34363c;
+  --shell-low: #050506;
+  --shell-print: #cfd2d6;
+  --shell-print-soft: #8c9096;
+
+  /* The rubber keys. One yellow, two states. */
+  --key: #f2c018;
+  --key-high: #ffe07a;
+  --key-low: #a37c07;
+
+  --bezel: #0a0a0b;
+}
+
+/* ---- The desk -------------------------------------------------------------- */
+
+:root {
+  /* The desk the machine is lying on. It is not the page ground and not the
+     screen: a black object on a white page reads as a picture of an object. */
+  --desk: #cfccc4;
+  --desk-low: #a8a49a;
+}
+
+:root[data-theme="dark"] {
+  --desk: #0e1014;
+  --desk-low: #050608;
+}
+
+:root[data-theme="mono"] {
+  --desk: #dedede;
+  --desk-low: #b4b4b4;
+}
+
+:root[data-theme="arcade"] {
+  --desk: #05100a;
+  --desk-low: #010504;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--desk);
+}
+
+.bench {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 3vw, 44px);
+  padding: clamp(12px, 2vh, 26px);
+  /* A lamp over the desk, so the machine sits on a surface rather than on a
+     background color. */
+  background:
+    radial-gradient(52% 44% at 40% 30%, #ffffff2e, #ffffff00 68%),
+    linear-gradient(168deg, var(--desk) 0%, var(--desk-low) 100%);
+}
+
+/* ---- The body -------------------------------------------------------------- */
+
+.handheld {
+  position: relative;
+  flex: 0 0 auto;
+  height: min(92vh, 1000px);
+  /* Wider than the photographed unit, and deliberately. A 1:1.6 body on a
+     laptop screen leaves a play field barely 280px across, and the network is
+     the thing this machine is for. */
+  aspect-ratio: 72 / 100;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3px, 0.6vh, 9px);
+  padding: clamp(10px, 1.6vh, 20px) clamp(10px, 1.5vw, 22px) clamp(8px, 1.2vh, 16px);
+  border-radius: 34px 34px 44px 44px;
+  color: var(--shell-print);
+  background:
+    linear-gradient(163deg, #ffffff10 0%, #ffffff00 26%),
+    linear-gradient(180deg, #26282d 0%, var(--shell) 16%, #101115 78%, #08090b 100%);
+  box-shadow:
+    inset 0 1px 0 #ffffff2e,
+    inset 0 -2px 3px #00000099,
+    inset 2px 0 3px #ffffff0a,
+    inset -2px 0 3px #00000080,
+    0 2px 4px #00000055,
+    0 26px 60px #000000aa,
+    0 60px 120px #00000070;
+}
+
+/* The moulding seam that runs around every case of this kind, where the two
+   halves of the shell meet. */
+.handheld::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 30px 30px 40px 40px;
+  border: 1px solid #ffffff0c;
+  pointer-events: none;
+}
+
+/* ---- The brand plate ------------------------------------------------------- */
+
+.plate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 auto;
+  padding: 4px 16px 5px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #2c2f35, #14161a);
+  box-shadow: inset 0 1px 0 #ffffff26, inset 0 -1px 0 #00000080, 0 1px 2px #00000066;
+}
+
+.plate-mark {
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  color: var(--key);
+}
+
+.plate-mark svg {
+  width: 100%;
+  height: 100%;
+}
+
+.plate-word {
+  font-size: clamp(12px, 1.5vh, 15px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #eef0f3;
+}
+
+.plate-word .brand-light {
+  color: var(--shell-print-soft);
+  font-weight: 500;
+}
+
+/* ---- The screen and its housing -------------------------------------------- */
+
+.screen-house {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  padding: clamp(8px, 1.1vh, 14px);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #050506, #0d0e10);
+  box-shadow: inset 0 2px 6px #000000cc, inset 0 -1px 0 #ffffff12, 0 1px 0 #ffffff10;
+}
+
+/* The two lightning decals every one of these machines has, printed on the
+   plastic either side of the glass. */
+.bolt {
+  position: absolute;
+  top: 12%;
+  width: 11px;
+  height: 30%;
+  background: #eceff2;
+  opacity: 0.9;
+  clip-path: polygon(58% 0, 12% 52%, 44% 52%, 22% 100%, 88% 42%, 52% 42%, 84% 0);
+}
+
+.bolt.left {
+  left: -15px;
+}
+
+.bolt.right {
+  right: -15px;
+  transform: scaleX(-1);
+}
+
+/* ---- The glass ------------------------------------------------------------- */
+
+/* The screen carries its own palette, and every lens inherits it. A lens draws
+   with --ink, --brand, --accent and the rest; inside the glass those are the
+   screen's ink, so the network is drawn by the screen rather than shown on it. */
+.lcd {
+  --lcd-glass: #b6bfa8;
+  --lcd-ink: #191d15;
+  --lcd-accent: #2f3a22;
+  --lcd-off: #00000018;
+
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 9px 6px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--lcd-glass);
+  box-shadow: inset 0 2px 7px #0000004d, inset 0 -1px 3px #ffffff30;
+
+  --stage: transparent;
+  --ink: var(--lcd-ink);
+  --ink-soft: color-mix(in srgb, var(--lcd-ink) 80%, var(--lcd-glass));
+  --muted: color-mix(in srgb, var(--lcd-ink) 58%, var(--lcd-glass));
+  --faint: color-mix(in srgb, var(--lcd-ink) 36%, var(--lcd-glass));
+  --brand: var(--lcd-ink);
+  --on-brand: var(--lcd-glass);
+  --link: var(--lcd-ink);
+  --accent: var(--lcd-accent);
+  --accent-soft: color-mix(in srgb, var(--lcd-ink) 12%, transparent);
+  --favors-left: var(--lcd-ink);
+  --favors-right: color-mix(in srgb, var(--lcd-ink) 45%, var(--lcd-glass));
+  --neutral-edge: color-mix(in srgb, var(--lcd-ink) 64%, var(--lcd-glass));
+  --glass: color-mix(in srgb, var(--lcd-glass) 88%, var(--lcd-ink));
+  --surface: var(--lcd-glass);
+  --wash: color-mix(in srgb, var(--lcd-ink) 8%, transparent);
+  --wash-firm: color-mix(in srgb, var(--lcd-ink) 16%, transparent);
+  --line: color-mix(in srgb, var(--lcd-ink) 34%, transparent);
+  --line-soft: color-mix(in srgb, var(--lcd-ink) 14%, transparent);
+  --shadow: none;
+}
+
+:root[data-theme="mono"] .lcd {
+  --lcd-glass: #c9cac6;
+  --lcd-ink: #0b0b0b;
+  --lcd-accent: #3a3a3a;
+}
+
+:root[data-theme="dark"] .lcd {
+  --lcd-glass: #16323a;
+  --lcd-ink: #a8ecf7;
+  --lcd-accent: #ffca7a;
+}
+
+:root[data-theme="arcade"] .lcd {
+  --lcd-glass: #061a10;
+  --lcd-ink: #43ef8c;
+  --lcd-accent: #ffb44a;
+}
+
+/* A backlit panel glows out past its own bezel; an unlit one does not. */
+:root[data-theme="dark"] .lcd,
+:root[data-theme="arcade"] .lcd {
+  box-shadow:
+    inset 0 2px 7px #00000066,
+    0 0 22px color-mix(in srgb, var(--lcd-ink) 22%, transparent);
+}
+
+/* The pixel grid. A real panel has a gap between cells, so the whole image sits
+   on a faint lattice; it is the single strongest cue that this is a screen and
+   not a picture of one. */
+.lcd-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(90deg, #00000012 0 1px, #00000000 1px 3px),
+    repeating-linear-gradient(0deg, #00000012 0 1px, #00000000 1px 3px);
+}
+
+/* The polarizer. Twisted nematic film is never quite neutral off-axis. */
+.lcd-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: linear-gradient(112deg, #ffffff1f 0%, #ffffff00 34%, #00000012 100%);
+}
+
+.lcd .vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: radial-gradient(120% 92% at 50% 46%, #00000000 52%, #00000024 100%);
+}
+
+/* ---- What is on the glass -------------------------------------------------- */
+
+.lcd-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+  font-size: clamp(8px, 1.05vh, 10.5px);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.lcd-cart {
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lcd-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(58px, 7vh, 86px);
+  gap: 6px;
+}
+
+.lcd .stage {
+  position: relative;
+  inset: auto;
+  grid-column: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+
+/* ---- The score column ------------------------------------------------------ */
+
+/* Every one of these machines keeps its counters down the right hand side of
+   the glass, and so does this one. What is counted here is what the fit
+   actually has: how big the network is, and how badly it disagrees with itself.
+   Nothing is invented to fill a slot. */
+.readouts {
+  position: relative;
+  inset: auto;
+  transform: none;
+  grid-column: 2;
+  z-index: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: clamp(2px, 1.1vh, 12px);
+  padding: 1px 0 0 6px;
+  border-left: 1px solid var(--line-soft);
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+}
+
+.readouts div {
+  padding: 0;
+  border: 0;
+  text-align: left;
+}
+
+.readouts dt {
+  font-size: clamp(6.5px, 0.85vh, 8.5px);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The unlit segments of a digit are still there on a real panel, faintly. The
+   ghost behind every number is that: the same field of eights, never on. */
+.readouts dd {
+  position: relative;
+  margin: 0;
+  font-size: clamp(10px, 1.5vh, 15px);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
+.readouts dd[data-ghost]::before {
+  content: attr(data-ghost);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--ink);
+  opacity: 0.13;
+}
+
+/* A proportion is not a count, so it is a bar of cells rather than a number. */
+.lcd-bar {
+  display: flex;
+  gap: 1.5px;
+  margin-top: 2px;
+}
+
+.lcd-bar i {
+  flex: 1 1 auto;
+  height: clamp(5px, 0.8vh, 8px);
+  background: var(--ink);
+  opacity: 0.12;
+}
+
+.lcd-bar i.lit {
+  opacity: 0.95;
+}
+
+/* A panel with the power off. The liquid crystal is untwisted, so nothing is
+   dark except the words printed into the glass itself, which are still there
+   whether or not there is a battery in the back. */
+.lcd.dark .lcd-head,
+.lcd.dark .lcd-body {
+  opacity: 0;
+}
+
+.lcd.dark .lcd-status span {
+  opacity: 0.12;
+}
+
+.lcd.dark {
+  box-shadow: inset 0 2px 7px #0000004d, inset 0 -1px 3px #ffffff30;
+}
+
+/* Paused means the sliding current stops where it is, everywhere it runs. */
+.bench.paused .flow-current,
+.bench.paused .wire-current,
+.bench.paused .diffusion-pulse {
+  animation-play-state: paused;
+}
+
+/* ---- The status line ------------------------------------------------------- */
+
+/* The words are printed into the panel and lit only when they are true, which
+   is how the real thing does it and is also the honest way: a reader can see
+   the whole vocabulary of states the machine has, and which of them hold. */
+.lcd-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding-top: 3px;
+  flex: 0 0 auto;
+  margin-top: 3px;
+  border-top: 1px solid var(--line-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+  font-size: clamp(6.5px, 0.88vh, 8.5px);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.lcd-status span {
+  opacity: 0.12;
+}
+
+.lcd-status span.lit {
+  opacity: 1;
+}
+
+/* ---- The deck, silkscreened on the shell ----------------------------------- */
+
+.console {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding: clamp(4px, 0.7vh, 8px) 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 13px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #00000038;
+  box-shadow: inset 0 1px 2px #00000080, inset 0 -1px 0 #ffffff10;
+  color: var(--shell-print);
+}
+
+.console .console-label {
+  color: var(--shell-print-soft);
+}
+
+.console .deck-reading {
+  color: #eef0f3;
+}
+
+/* ---- The printed band ------------------------------------------------------ */
+
+.band {
+  margin: 0 auto;
+  padding: 2px 22px 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #232529, #131417);
+  box-shadow: inset 0 1px 0 #ffffff1f, inset 0 -1px 0 #00000073;
+  font-size: clamp(8px, 1.1vh, 11px);
+  font-weight: 700;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+  color: #e7eaee;
+}
+
+/* ---- The game keys --------------------------------------------------------- */
+
+/* Eight lenses, eight games, numbered on the shell the way the box numbers
+   them. This is the machine's menu and it is printed, not drawn on the glass,
+   because on a machine like this the menu always is. */
+.game-bar {
+  position: relative;
+  inset: auto;
+  transform: none;
+  z-index: auto;
+  max-width: none;
+  overflow: visible;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(3px, 0.6vh, 7px);
+  padding: 0;
+}
+
+.game-key {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: clamp(3px, 0.6vh, 6px) 2px clamp(2px, 0.4vh, 4px);
+  border: 0;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #26282d, #131418);
+  box-shadow: inset 0 1px 0 #ffffff1c, inset 0 -1px 0 #00000080, 0 1px 2px #00000059;
+  color: var(--shell-print-soft);
+  cursor: pointer;
+  transition: transform 0.06s ease, box-shadow 0.06s ease, color 0.16s ease;
+}
+
+.game-key-number {
+  font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+  font-size: clamp(8px, 1.05vh, 11px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.game-key-name {
+  font-size: clamp(6.5px, 0.85vh, 8.5px);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.game-key:hover {
+  color: #eceff2;
+}
+
+.game-key.active {
+  color: #0d0e10;
+  background: linear-gradient(180deg, var(--key-high), var(--key));
+  box-shadow: inset 0 1px 0 #ffffff8c, inset 0 -2px 3px #00000038, 0 1px 2px #00000073;
+}
+
+.game-key:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 3px #000000a6;
+}
+
+/* ---- The keys -------------------------------------------------------------- */
+
+/* One rubber key, moulded. The dome is a radial highlight offset up and left,
+   the skirt is a dark ring, and pressing it moves the cap down by a pixel and
+   swaps the highlight for an inset shadow. Nothing about it animates on its
+   own. */
+.key {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background:
+    radial-gradient(70% 70% at 36% 28%, var(--key-high), var(--key) 58%, var(--key-low) 100%);
+  box-shadow:
+    inset 0 1px 1px #ffffffa6,
+    inset 0 -2px 3px #00000040,
+    0 2px 3px #00000073,
+    0 0 0 2px #0000004d;
+  transition: transform 0.06s ease, box-shadow 0.06s ease, filter 0.16s ease;
+}
+
+.key:active,
+.key.pressed {
+  transform: translateY(1.5px);
+  box-shadow: inset 0 2px 4px #00000073, 0 1px 1px #00000059, 0 0 0 2px #0000004d;
+}
+
+.key.round {
+  width: clamp(15px, 2.1vh, 21px);
+  height: clamp(15px, 2.1vh, 21px);
+  border-radius: 50%;
+}
+
+.key.big {
+  width: clamp(46px, 7vh, 68px);
+  height: clamp(46px, 7vh, 68px);
+  border-radius: 50%;
+}
+
+/* A key whose state is on rather than momentary is lit from within. */
+.key.on {
+  filter: brightness(1.16);
+  box-shadow:
+    inset 0 1px 1px #ffffffbf,
+    inset 0 -2px 3px #00000040,
+    0 2px 3px #00000073,
+    0 0 0 2px #0000004d,
+    0 0 12px #f2c01880;
+}
+
+.key[disabled] {
+  filter: grayscale(0.75) brightness(0.6);
+  cursor: not-allowed;
+}
+
+.functions {
+  display: flex;
+  justify-content: center;
+  gap: clamp(10px, 2.4vw, 26px);
+  padding: clamp(2px, 0.5vh, 6px) 0;
+}
+
+.function {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.key-label {
+  font-size: clamp(6px, 0.82vh, 8px);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--shell-print-soft);
+}
+
+/* ---- The pad and the big button -------------------------------------------- */
+
+.pads {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: clamp(2px, 0.6vh, 8px) clamp(4px, 1.4vw, 18px);
+}
+
+.dpad {
+  position: relative;
+  width: clamp(56px, 8.4vh, 88px);
+  height: clamp(56px, 8.4vh, 88px);
+}
+
+.key.pad {
+  position: absolute;
+  width: 34%;
+  height: 34%;
+  border-radius: 22% 22% 30% 30%;
+}
+
+.key.pad.up {
+  left: 33%;
+  top: 0;
+}
+
+.key.pad.down {
+  left: 33%;
+  bottom: 0;
+  border-radius: 30% 30% 22% 22%;
+}
+
+.key.pad.left {
+  left: 0;
+  top: 33%;
+  border-radius: 22% 30% 30% 22%;
+}
+
+.key.pad.right {
+  right: 0;
+  top: 33%;
+  border-radius: 30% 22% 22% 30%;
+}
+
+/* The hub the four keys rock on, which on the real thing is one moulding. */
+.dpad-hub {
+  position: absolute;
+  left: 33%;
+  top: 33%;
+  width: 34%;
+  height: 34%;
+  border-radius: 4px;
+  background: radial-gradient(70% 70% at 40% 32%, var(--key-high), var(--key) 70%, var(--key-low));
+  box-shadow: inset 0 1px 1px #ffffff8c, inset 0 -1px 2px #00000040, 0 0 0 2px #0000004d;
+  pointer-events: none;
+}
+
+.action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ---- The bottom decal ------------------------------------------------------ */
+
+.decal {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 0 9px;
+  padding: clamp(2px, 0.6vh, 8px) 6px 0;
+  color: #e9ecef;
+}
+
+.decal-mouse {
+  grid-row: 1 / 3;
+  display: inline-flex;
+  width: clamp(20px, 3vh, 30px);
+  height: clamp(20px, 3vh, 30px);
+  color: #e9ecef;
+  opacity: 0.9;
+}
+
+.decal-mouse svg {
+  width: 100%;
+  height: 100%;
+}
+
+.decal-name {
+  font-size: clamp(7px, 0.95vh, 9.5px);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--key);
+}
+
+.decal-title {
+  grid-column: 2;
+  font-size: clamp(11px, 1.7vh, 18px);
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+.decal-count {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: end;
+  align-self: center;
+  font-size: clamp(8px, 1.15vh, 12px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--key);
+}
+
+/* ---- The manual ------------------------------------------------------------ */
+
+/* Everything the glass is too small to hold: the estimates, the routes, the
+   contributions, the settings. It is the instruction sheet from the box, so it
+   is paper stock, printed in one ink, set in a typewriter face for the tables
+   and a text face for the prose. */
+.manual {
+  flex: 0 1 clamp(320px, 34vw, 520px);
+  align-self: stretch;
+  max-height: 96vh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: clamp(14px, 2vh, 26px) clamp(14px, 1.6vw, 26px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+  border-radius: 3px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+}
+
+/* The fold the sheet came in, and the tooth of cheap paper. */
+.manual::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.manual-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.manual-kicker {
+  font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.manual-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.tab svg {
+  width: 13px;
+  height: 13px;
+}
+
+.tab.square {
+  padding: 5px;
+}
+
+.tab:hover {
+  background: var(--wash);
+  color: var(--ink);
+}
+
+.manual-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+/* The panels are no longer floating glass; on paper they are sections of one
+   printed sheet. */
+.manual .controls,
+.manual .inspector {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.manual .controls {
+  gap: 13px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* ---- What the old layout did, undone --------------------------------------- */
+
+.identity,
+.top-actions {
+  display: none;
+}
+
+/* ---- Narrow ---------------------------------------------------------------- */
+
+/* Below this the two cannot sit side by side, so the sheet goes under the
+   machine and the whole thing scrolls, which is what you would do with a real
+   one on a small table. */
+@media (max-width: 1040px) {
+  .bench {
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .handheld {
+    height: min(88vh, 900px);
+  }
+
+  .manual {
+    flex: 0 0 auto;
+    width: min(560px, 100%);
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* On a phone the shell keeps its keys, because they are now the only transport
+   there is: the deck was never reachable at this width. */
+@media (max-width: 640px) {
+  .handheld {
+    height: auto;
+    aspect-ratio: auto;
+    width: min(420px, 100%);
+  }
+
+  .screen-house {
+    min-height: 58vh;
+  }
+
+  .bolt {
+    display: none;
+  }
+}
+
+/* The sheet itself. Cheap uncoated stock in the paper themes, and the same
+   card the rest of the site uses in the lit ones, because a white sheet beside
+   a backlit screen at night is the one thing nobody wants. */
+:root[data-theme="light"] .manual,
+:root[data-theme="mono"] .manual {
+  background:
+    repeating-linear-gradient(0deg, #00000005 0 1px, #00000000 1px 4px),
+    linear-gradient(180deg, #fdfcf8, #f4f2ea);
+  box-shadow: 0 1px 2px #00000026, 0 18px 40px #00000026;
+}
+
+/* The sheets the Data and About tabs open cover the desk, not one panel of it. */
+.overlay {
+  position: fixed;
+}
+
+/* A deck reading long enough to run past the shell is wrapped rather than
+   allowed to print on the desk either side of the machine. */
+.console > * {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.console .console-group {
+  flex-wrap: wrap;
+  justify-content: center;
+}

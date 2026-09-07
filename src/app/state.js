@@ -29,6 +29,11 @@ export const state = {
   // read their own keys and ignore the rest.
   options: {},
   separation: 0, // 0 is the network, 1 is the exploded study inventory
+
+  // The machine itself. Power is the mains switch on the shell, not the plug in
+  // the circuit: one turns the display off, the other opens the source branch.
+  power: true,
+  paused: false,
   // Treatments the reader has placed by hand, as fractions of the clear box so
   // that a pinned treatment stays where it was put when the window resizes.
   pins: {}, // treatment -> { u, v }
