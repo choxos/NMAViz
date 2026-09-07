@@ -46,10 +46,11 @@ export const reconstruction = {
     // are drawn as fit above it; the rest are gathered into one bar. The list
     // is sorted by size, so what is dropped is always what moved the estimate
     // least.
-    const top = 132;
-    // The tension block sits at the foot of the window, clear of the readouts
-    // that float there, and the waterfall takes what is left above it.
-    const tensionTop = height - 208;
+    const top = Math.max(46, Math.min(132, height * 0.19));
+    // The tension block sits at the foot of the drawing and the waterfall takes
+    // what is left above it. On a short panel the block is given a share rather
+    // than a fixed 208 pixels, which used to leave it above the first bar.
+    const tensionTop = height - Math.max(96, Math.min(208, height * 0.3));
     const available = Math.max(120, tensionTop - top - 70);
     const capacity = Math.max(5, Math.min(18, Math.floor(available / 26)));
     const shown = projection.studies.slice(0, capacity);
@@ -82,11 +83,11 @@ export const reconstruction = {
     const high = Math.max(...bounds);
     const pad = (high - low || 1) * 0.16;
 
-    // A label column inside the drawing area, so no text is ever drawn over the
-    // controls that float at the bottom left of the window.
-    const labelColumn = Math.max(340, width * 0.27);
-    const left = labelColumn + 152;
-    const right = width - Math.min(400, width * 0.34);
+    // A column down the left for the pair each bar belongs to, sized to the
+    // drawing rather than to the panels that used to float over it.
+    const labelColumn = Math.max(78, width * 0.22);
+    const left = labelColumn + Math.max(40, width * 0.1);
+    const right = width - Math.max(40, width * 0.11);
     const x = (value) => left + ((value - (low - pad)) / (high - low + 2 * pad)) * (right - left);
 
     const gap = Math.min(28, available / Math.max(1, walk.length));

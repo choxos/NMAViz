@@ -93,10 +93,12 @@ export const springs = {
       ...routes.map((r) => r.TE),
     ].filter(Number.isFinite);
     const spread = Math.max(...values.map(Math.abs), 1e-6) * 1.35;
-    // The controls panel floats over the bottom left of the window, so nothing
-    // in this diagram, labels included, is drawn to the left of here.
-    const left = Math.max(348, width * 0.28);
-    const right = width - Math.min(400, width * 0.34);
+    // Room down the left for the row labels, and a smaller margin on the right
+    // for the numbers. These used to be the width of the panels that floated
+    // over the canvas; the canvas is now a panel of its own with nothing on top
+    // of it, so they are what the drawing itself needs and no more.
+    const left = Math.max(96, width * 0.26);
+    const right = width - Math.max(48, width * 0.13);
     const middle = (left + right) / 2;
     const scale = (right - left) / (2 * spread);
     const at = (value) => middle + value * scale;
@@ -143,10 +145,12 @@ export const springs = {
       seTE: model.seTE[a][b],
     });
 
-    const top = 158;
-    // The floor is where the panels start, not where the window ends, so the
-    // last row and the axis labels under it stay clear of the deck.
-    const floor = (box?.bottom ?? height - 118) - 46;
+    // The first row sits below the axis caption, and the last one above the
+    // axis labels. Both were pixel constants for a canvas the height of a
+    // window; on a panel a few hundred pixels tall they left the rows stacked
+    // on top of one another.
+    const top = Math.max(52, Math.min(158, height * 0.22));
+    const floor = (box?.bottom ?? height) - Math.max(26, height * 0.08);
     const gap = Math.min(54, (floor - top) / Math.max(1, rows.length));
     const nullAt = at(0);
 

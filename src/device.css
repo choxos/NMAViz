@@ -475,7 +475,6 @@ body {
   justify-content: center;
   flex-wrap: wrap;
   gap: 6px 13px;
-  overflow: hidden;
   border-radius: 8px;
   background: #00000038;
   box-shadow: inset 0 1px 2px #00000080, inset 0 -1px 0 #ffffff10;
