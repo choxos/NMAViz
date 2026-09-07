@@ -31,10 +31,9 @@
   --shell-print: #cfd2d6;
   --shell-print-soft: #8c9096;
 
-  /* The rubber keys. One yellow, two states. */
-  --key: #f2c018;
-  --key-high: #ffe07a;
-  --key-low: #a37c07;
+  /* The keys. One flat yellow, printed on the plastic rather than molded out
+     of it, which is what the machine this copies actually has. */
+  --key: #feef53;
 
   --bezel: #0a0a0b;
 }
@@ -557,8 +556,8 @@ body {
 
 .game-key.active {
   color: #0d0e10;
-  background: linear-gradient(180deg, var(--key-high), var(--key));
-  box-shadow: inset 0 1px 0 #ffffff8c, inset 0 -2px 3px #00000038, 0 1px 2px #00000073;
+  background: var(--key);
+  box-shadow: 0 1px 2px #00000073;
 }
 
 .game-key:active {
@@ -568,28 +567,22 @@ body {
 
 /* ---- The keys -------------------------------------------------------------- */
 
-/* One rubber key, moulded. The dome is a radial highlight offset up and left,
-   the skirt is a dark ring, and pressing it moves the cap down by a pixel and
-   swaps the highlight for an inset shadow. Nothing about it animates on its
-   own. */
+/* One key: flat yellow, sitting on the black plastic with nothing but a shadow
+   under it. Pressing it moves the cap down by a pixel and takes the shadow
+   away. Nothing about it animates on its own. */
 .key {
   border: 0;
   padding: 0;
   cursor: pointer;
-  background:
-    radial-gradient(70% 70% at 36% 28%, var(--key-high), var(--key) 58%, var(--key-low) 100%);
-  box-shadow:
-    inset 0 1px 1px #ffffffa6,
-    inset 0 -2px 3px #00000040,
-    0 2px 3px #00000073,
-    0 0 0 2px #0000004d;
+  background: var(--key);
+  box-shadow: 0 2px 3px #00000073;
   transition: transform 0.06s ease, box-shadow 0.06s ease, filter 0.16s ease;
 }
 
 .key:active,
 .key.pressed {
   transform: translateY(1.5px);
-  box-shadow: inset 0 2px 4px #00000073, 0 1px 1px #00000059, 0 0 0 2px #0000004d;
+  box-shadow: 0 1px 1px #00000059;
 }
 
 .key.round {
@@ -606,13 +599,7 @@ body {
 
 /* A key whose state is on rather than momentary is lit from within. */
 .key.on {
-  filter: brightness(1.16);
-  box-shadow:
-    inset 0 1px 1px #ffffffbf,
-    inset 0 -2px 3px #00000040,
-    0 2px 3px #00000073,
-    0 0 0 2px #0000004d,
-    0 0 12px #f2c01880;
+  box-shadow: 0 2px 3px #00000073, 0 0 12px #feef5380;
 }
 
 .key[disabled] {
@@ -687,7 +674,7 @@ body {
   border-radius: 30% 22% 22% 30%;
 }
 
-/* The hub the four keys rock on, which on the real thing is one moulding. */
+/* The hub the four keys rock on, which on the real thing is one molding. */
 .dpad-hub {
   position: absolute;
   left: 33%;
@@ -695,8 +682,7 @@ body {
   width: 34%;
   height: 34%;
   border-radius: 4px;
-  background: radial-gradient(70% 70% at 40% 32%, var(--key-high), var(--key) 70%, var(--key-low));
-  box-shadow: inset 0 1px 1px #ffffff8c, inset 0 -1px 2px #00000040, 0 0 0 2px #0000004d;
+  background: var(--key);
   pointer-events: none;
 }
 

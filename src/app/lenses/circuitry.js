@@ -102,17 +102,26 @@ export function sourceBranch(a, b, box) {
   const cx = (box.left + box.right) / 2;
   const cy = (box.top + box.bottom) / 2;
 
-  // Bow away from the middle of the drawing, so the source loop sits outside
-  // the network rather than through it.
-  let ax = mx - cx;
-  let ay = my - cy;
-  const away = Math.hypot(ax, ay);
-  if (away < 1e-6) {
+  // Bow square to the line between the two treatments, to whichever side of it
+  // faces away from the middle of the drawing. Bowing straight away from the
+  // middle instead would fold the branch back along itself whenever the pair
+  // happens to point that way, and a loop folded flat has no outside for the
+  // source and its switch to sit in.
+  let ax = -(b.y - a.y);
+  let ay = b.x - a.x;
+  const across = Math.hypot(ax, ay);
+  if (across < 1e-6) {
     ax = 0;
     ay = -1;
   } else {
-    ax /= away;
-    ay /= away;
+    ax /= across;
+    ay /= across;
+    // Two sides to choose from, and the one away from the middle keeps the
+    // branch off the comparisons.
+    if (ax * (mx - cx) + ay * (my - cy) < 0) {
+      ax = -ax;
+      ay = -ay;
+    }
   }
   // Far enough out that the branch and its battery clear the network rather
   // than sitting on top of the treatment they leave from.
@@ -134,14 +143,11 @@ export function sourceBranch(a, b, box) {
   const ty = b.y - a.y;
   const tl = Math.hypot(tx, ty) || 1;
 
-  // The switch is mounted on the half of the branch that runs into a, the
-  // treatment the current is driven into, because that is where a reader looks
-  // for the thing that decides whether the source reaches the network at all.
-  // Where exactly on that half is not fixed: the leg is short when the two
-  // treatments are close together, so the switch takes the point on it that is
-  // as far from the treatment and from the source symbol as the leg allows. On
-  // a short leg that still leaves it touching one of them; searching only this
-  // half is what keeps it from wandering onto a wire that carries evidence.
+  // The switch is mounted out in the open part of the branch rather than up
+  // against either treatment. Which point that is depends on the shape of the
+  // bow, so it is found rather than fixed: the one furthest from both ends and
+  // from the source symbol between them, which is the middle of whichever
+  // stretch of the branch has the most room.
   const lerp = (p, q, t) => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
   const on = (t) => lerp(lerp(b, control, t), lerp(control, a, t), t);
   const tangent = (t) => {
@@ -157,11 +163,12 @@ export function sourceBranch(a, b, box) {
     const p = on(t);
     return Math.min(
       Math.hypot(p.x - a.x, p.y - a.y),
+      Math.hypot(p.x - b.x, p.y - b.y),
       Math.hypot(p.x - apex.x, p.y - apex.y)
     );
   };
-  let SWITCH = 0.75;
-  for (let t = 0.56; t <= 0.94; t += 0.02) if (clearance(t) > clearance(SWITCH)) SWITCH = t;
+  let SWITCH = 0.5;
+  for (let t = 0.15; t <= 0.85; t += 0.02) if (clearance(t) > clearance(SWITCH)) SWITCH = t;
 
   return {
     // Drawn from b to a: outside the network the current returns to where it

@@ -32,17 +32,15 @@ try {
 
   // The mains switch. It sits on the canvas over the wires, so this proves both
   // that it takes the press there and that the circuit state follows it.
-  const rockerWord = () => page.evaluate(() => document.querySelector(".rocker-label").textContent);
-  await page.locator("#stage .rocker").waitFor();
-  assert.equal(await rockerWord(), "ON");
+  await page.locator("#stage .rocker.closed").waitFor();
   await page.locator("#stage .rocker").click();
   await page.locator(".source.off").waitFor();
-  assert.equal(await rockerWord(), "OFF");
+  assert.equal(await page.locator("#stage .rocker.open").count(), 1);
   assert.equal(await page.locator(".wire-current").count(), 0);
   assert.equal(await page.locator("[data-switch].deck-button").innerText(), "Switch it on");
   await page.locator("[data-switch].deck-button").click();
   await page.waitForFunction(() => document.querySelectorAll(".source.off").length === 0);
-  assert.equal(await rockerWord(), "ON");
+  assert.equal(await page.locator("#stage .rocker.closed").count(), 1);
   await page.locator("#data-button").click();
   await page.locator('[role="dialog"]').waitFor();
   assert.equal(await page.evaluate(() => !!document.activeElement.closest('[role="dialog"]')), true);

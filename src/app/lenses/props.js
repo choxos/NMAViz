@@ -17,40 +17,41 @@
 
 const round = (n) => n.toFixed(1);
 
-/* The switch: an inline rocker in the source lead, the kind molded into the
- * cable of a lamp.
+/* The switch: a panel-mount rocker set into the source lead.
  *
- * It is drawn in its own frame so that the printed word stays level whichever
- * way the branch runs beneath it, and the body is opaque so that the wire it
- * sits on visibly ends at its two faces. The word rides on the paddle rather
- * than beside it, because the branch it sits on is short on a crowded network
- * and a switch that needs room for a second panel of text would land on the
- * treatment or on the source.
+ * It is drawn in its own frame so that the markings stay level whichever way
+ * the branch runs beneath it, and the body is opaque so that the wire it sits
+ * on visibly ends at its two faces. The paddle is a see-saw: the half that is
+ * pressed down is the one in shadow, and the marks are the ones stamped into
+ * every rocker made, a bar for the closed circuit and a ring for the open one.
+ * Pressing the bar end down drives the current, which is what the bar means.
  */
 export function switchMarkup(at, direction, closed) {
-  // A word printed upside down is worse than a switch mounted the other way
+  // Markings printed upside down are worse than a switch mounted the other way
   // round, and the body is symmetric, so a branch running to the left flips.
   const flipped = direction.x < 0;
   const facing = flipped ? { x: -direction.x, y: -direction.y } : direction;
   const angle = (Math.atan2(facing.y, facing.x) * 180) / Math.PI;
-  // Which way along the wire the current would run, in the flipped frame.
-  const downstream = flipped ? -1 : 1;
-  // Pressed toward the network when the circuit is made and backed off toward
-  // the source when it is broken, so the paddle says which way current is let
-  // through. That also keeps the word OFF, the one a reader must be able to
-  // read, at the end away from the treatment and its label.
-  const side = closed ? downstream : -downstream;
+  // The bar sits at the downstream end, so that pressing the end the current
+  // would leave by is what lets it leave.
+  const bar = flipped ? -1 : 1;
+  // Whichever half is held down is the one the paddle has sunk into.
+  const sunk = closed ? bar : -bar;
 
   return `
     <g class="rocker${closed ? " closed" : " open"}" data-switch="${
       closed ? "off" : "on"
     }" transform="translate(${round(at.x)} ${round(at.y)}) rotate(${angle.toFixed(1)})">
-      <rect class="hit-node" x="-32" y="-19" width="64" height="38"/>
-      <rect class="rocker-body" x="-22" y="-11" width="44" height="22" rx="6"/>
-      <rect class="rocker-paddle" x="${side * 10 - 10}" y="-8" width="20" height="16" rx="3.5"/>
-      <text class="rocker-label" x="${side * 10}" y="3" text-anchor="middle">${
-        closed ? "ON" : "OFF"
-      }</text>
+      <rect class="hit-node" x="-32" y="-23" width="64" height="46"/>
+      <rect class="rocker-bezel" x="-23" y="-15" width="46" height="30" rx="3.5"/>
+      <rect class="rocker-paddle" x="-19" y="-11.5" width="38" height="23" rx="2"/>
+      <rect class="rocker-pressed" x="${sunk < 0 ? -19 : 0}" y="-11.5" width="19" height="23" rx="2"/>
+      <line class="rocker-mark${sunk === bar ? " sunk" : ""}" x1="${bar * 9.5}" y1="-5.5" x2="${
+        bar * 9.5
+      }" y2="5.5"/>
+      <circle class="rocker-mark${sunk === bar ? "" : " sunk"}" cx="${
+        -bar * 9.5
+      }" cy="0" r="4.2"/>
     </g>`;
 }
 

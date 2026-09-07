@@ -369,41 +369,43 @@ input[type="range"] {
   cursor: grabbing;
 }
 
-/* The rocker in the source lead. The state of the circuit is readable from the
-   picture without a word of text, and the word is printed anyway because that
-   is what is molded into the real ones. */
+/* The rocker in the source lead. Which way it is thrown is readable from the
+   picture without a word of text: the half held down is the half in shadow,
+   and the bar and the ring say which of them is which. */
 .rocker {
   cursor: pointer;
 }
 
-.rocker-body {
+.rocker-bezel {
   fill: var(--surface);
   stroke: var(--brand);
-  stroke-width: 1.7;
+  stroke-width: 1.8;
 }
 
 .rocker-paddle {
   fill: var(--surface);
   stroke: var(--brand);
-  stroke-width: 1.3;
+  stroke-width: 1.1;
 }
 
-.rocker-label {
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+/* The end that is pressed in. Solid rather than shaded, because the drawing is
+   flat and a gradient would be the only thing on this canvas pretending to be
+   lit from somewhere. */
+.rocker-pressed {
   fill: var(--brand);
 }
 
-/* Pressed off, the paddle goes solid and the word reverses out of it. The pair
-   is the same one the body already uses, so the word stays legible on a screen
-   of any color the shell offers. */
-.rocker.open .rocker-paddle {
-  fill: var(--brand);
+.rocker-mark {
+  fill: none;
+  stroke: var(--brand);
+  stroke-width: 1.7;
+  stroke-linecap: round;
 }
 
-.rocker.open .rocker-label {
-  fill: var(--surface);
+/* A mark stamped on the sunk half reverses out of it. The pair is the one the
+   body already uses, so it stays legible on any screen the shell offers. */
+.rocker-mark.sunk {
+  stroke: var(--surface);
 }
 
 /* The probes: which two treatments the potential is measured across. */
