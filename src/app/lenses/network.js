@@ -205,26 +205,41 @@ function circuit(context, geometry, emphasis) {
       const { d, symbol } = drawn;
       if (!symbol) suppressed += 1;
 
-      // With the separation control open the comparison comes apart into its
-      // studies, which in circuit terms is what it always was: conductances in
-      // parallel between the same two junctions.
-      const parallel =
-        state.separation > 0.02
-          ? strands
-              .map(
-                (strand) =>
-                  `<path class="wire-strand" data-study="${escape(
-                    strand.row.studlab
-                  )}" d="${strand.path}" stroke-width="${strand.width.toFixed(2)}"/>`
-              )
-              .join("")
-          : "";
-
       // Where current actually runs, a second stroke slides along the wire. The
       // speed is the same everywhere on purpose: in a conductor it is the cross
       // section that carries the current, so here it is the width and only the
       // width that says how much evidence travels this way.
       const live = powered ? ((currents ?? liveEdges)?.get(key) ?? 0) : 0;
+
+      // With the separation control open the comparison comes apart into its
+      // studies, which in circuit terms is what it always was: conductances in
+      // parallel between the same two junctions.
+      //
+      // So the current comes apart with it. Current through parallel branches
+      // divides in proportion to their conductances, which is the same share
+      // the strand's own width already draws, and it is the whole reason a
+      // comparison carried by one large trial is not the same thing as one
+      // carried by six small ones. Drawing the current only on the trunk would
+      // say the studies are where the evidence sits and the wire is where it
+      // moves, and there is no such distinction here.
+      const parallel =
+        state.separation > 0.02
+          ? strands
+              .map((strand) => {
+                const through = live * strand.share;
+                return `<path class="wire-strand" data-study="${escape(
+                  strand.row.studlab
+                )}" d="${strand.path}" stroke-width="${strand.width.toFixed(2)}"/>${
+                  through > 1e-4
+                    ? `<path class="wire-current" d="${strand.path}" stroke-width="${Math.max(
+                        0.8,
+                        strand.width * 0.5
+                      ).toFixed(2)}"/>`
+                    : ""
+                }`;
+              })
+              .join("")
+          : "";
       return `
         <g class="wire${carrying ? " carrying" : ""}${symbol ? "" : " bare"}" data-edge="${escape(
           key
@@ -232,7 +247,10 @@ function circuit(context, geometry, emphasis) {
           ${hit(arc(a, b))}
           <path class="wire-line" d="${d}" stroke-width="${width.toFixed(2)}"/>
           ${
-            live > 1e-4
+            // Fanned open, the current is on the strands instead; drawing it
+            // here as well would show the comparison carrying its own current
+            // on top of the studies that are carrying all of it.
+            live > 1e-4 && !parallel
               ? `<path class="wire-current" d="${d}" stroke-width="${Math.max(
                   1,
                   width * 0.5

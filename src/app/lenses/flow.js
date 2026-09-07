@@ -174,17 +174,22 @@ export const flow = {
             ? strandsOf(edge.comparison, a, tip, state.separation)
                 .map((strand) => {
                   const share = edge.flow * strand.share;
+                  const band = scaleBetween(share, 0, largest, 1, 11);
+                  // The band is how much travels this way and the sliding
+                  // stroke is it travelling, so once the comparison is fanned
+                  // open both belong on the strands: the current divides
+                  // between the studies exactly as their weights do, and it is
+                  // the studies it is running through.
                   return `
                     <path class="flow-band strand" data-study="${escape(strand.row.studlab)}"
-                      d="${strand.path}" stroke-width="${scaleBetween(
-                        share,
-                        0,
-                        largest,
-                        1,
-                        11
-                      ).toFixed(2)}" marker-end="url(#flow-arrow)">
+                      d="${strand.path}" stroke-width="${band.toFixed(
+                        2
+                      )}" marker-end="url(#flow-arrow)">
                       <title>${escape(strand.row.studlab)}: ${percent(share, 1)} of the estimate</title>
-                    </path>`;
+                    </path>
+                    <path class="flow-current" d="${strand.path}" stroke-width="${(
+                      band * 0.55
+                    ).toFixed(2)}"/>`;
                 })
                 .join("")
             : "";
@@ -199,7 +204,8 @@ export const flow = {
             <path class="flow-band" d="${path}" stroke-width="${width.toFixed(2)}"
               ${carrying && !parallel ? 'marker-end="url(#flow-arrow)"' : ""}/>
             ${
-              carrying
+              // Fanned open, the current runs on the strands instead.
+              carrying && !parallel
                 ? `<path class="flow-current" d="${path}" stroke-width="${(width * 0.55).toFixed(
                     2
                   )}"/>`

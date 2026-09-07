@@ -20,26 +20,83 @@ import { evidenceFlow, flowPaths } from "../../nma/flow.js";
 import { rigEnergy } from "../play.js";
 import { effect, escape, isRatio, number, onScale, percent, shortLabel } from "../ui.js";
 
-/* A coil drawn between two points on one line. More turns and a thicker wire
- * mean a stiffer spring, which is a more precise study. */
-function coil(x1, x2, y, stiffness) {
+/* A helical spring, seen from the side.
+ *
+ * A zigzag is a picture of a spring; this is a drawing of one, and the
+ * difference is worth the arithmetic because everything a reader can see in it
+ * is something the study actually has.
+ *
+ * A real helical spring obeys
+ *
+ *     k = G d⁴ / (8 D³ n)
+ *
+ * for wire gauge d, coil diameter D and number of turns n. So a stiff spring is
+ * one wound from thick wire in a tight coil with few turns, and a floppy one is
+ * thin wire in a wide coil with many of them. The old drawing had it backwards:
+ * it gave the stiffest springs the MOST turns, which is exactly the wrong way
+ * round, and a reader who knows what a spring is would have read every precise
+ * study as a weak one.
+ *
+ * The projection is the honest part. Turns are drawn as what they are, a
+ * helix: the wire runs forward along the axis while it goes round, so each loop
+ * leans, and the loops overlap when the spring is compressed and open out into
+ * a stretched-out corkscrew when it is pulled. The number of turns never
+ * changes as it moves, because winding a spring is not something pulling on it
+ * can do. Only the pitch changes, which is the one thing extension is.
+ *
+ * There is no compressed spring in this picture, and that is not a
+ * simplification. Each study's spring runs from its own effect to wherever the
+ * bundle is being held, and the force it puts out is k(y − x): the spring is
+ * stretched by exactly that distance, whichever side of the bundle it is on.
+ * A spring drawn short is one whose study nearly agrees with the pooled
+ * estimate, so its coils bunch up near their free length rather than bottoming
+ * out against anything.
+ */
+
+/* How much of the coil's own width the wire runs forward per turn. Pure side-on
+ * (0) draws a flat zigzag; too much and the loops read as a slinky lying on the
+ * floor rather than a spring under tension. */
+const LEAN = 0.42;
+/* Samples per turn. Ten is enough that a loop reads as round at any size the
+ * panel can show. */
+const SAMPLES = 10;
+
+export function coil(x1, x2, y, stiffness) {
   const span = x2 - x1;
   const direction = Math.sign(span) || 1;
   const length = Math.abs(span);
-  const turns = Math.max(3, Math.min(18, Math.round(4 + stiffness * 14)));
-  const lead = Math.min(14, length * 0.16);
-  const body = Math.max(6, length - 2 * lead);
-  const step = body / turns;
-  const amplitude = 6;
 
-  let d = `M${x1} ${y}L${x1 + direction * lead} ${y}`;
-  for (let i = 0; i < turns; i++) {
-    const start = x1 + direction * (lead + i * step);
-    d += `L${start + direction * step * 0.25} ${y - amplitude}`;
-    d += `L${start + direction * step * 0.75} ${y + amplitude}`;
-    d += `L${start + direction * step} ${y}`;
+  // The three things that set the stiffness of a real spring, all moving the
+  // way the formula says: thicker wire, tighter coil, fewer turns.
+  const gauge = 1.1 + 2.4 * stiffness;
+  const radius = 8.4 - 3.4 * stiffness;
+  const turns = Math.max(4, Math.round(13 - 8 * stiffness));
+
+  // The straight ends the spring is held by.
+  const lead = Math.min(13, Math.max(4, length * 0.14));
+  const body = Math.max(2, length - 2 * lead);
+  const pitch = body / turns;
+
+  const start = x1 + direction * lead;
+  const points = [`M${x1.toFixed(1)} ${y.toFixed(1)}`, `L${start.toFixed(1)} ${y.toFixed(1)}`];
+  const steps = turns * SAMPLES;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const angle = 2 * Math.PI * turns * t;
+    // Along the axis the wire advances steadily and swings back and forth by a
+    // fraction of the coil, which is what makes the loops lean and overlap. The
+    // swing is taken out at both ends, so the end turns close onto the straight
+    // leads the way a ground end does and no loop reaches past the point the
+    // spring is anchored at.
+    const along =
+      body * t + Math.cos(angle) * pitch * LEAN * Math.sin(Math.PI * t);
+    const across = Math.sin(angle) * radius;
+    points.push(
+      `L${(start + direction * along).toFixed(1)} ${(y + across).toFixed(1)}`
+    );
   }
-  return `${d}L${x2} ${y}`;
+  points.push(`L${x2.toFixed(1)} ${y.toFixed(1)}`);
+  return { d: points.join(""), gauge };
 }
 
 export const springs = {
@@ -111,6 +168,12 @@ export const springs = {
     const relative = (se) => Math.min(1, 1 / se ** 2 / strongest);
 
     // Lay the mechanism out from the top: the direct studies, then the routes.
+    // The first row sits below the axis caption, and the last one above the
+    // axis labels. Both were pixel constants for a canvas the height of a
+    // window; on a panel a few hundred pixels tall they left the rows stacked
+    // on top of one another.
+    const top = Math.max(52, Math.min(158, height * 0.22));
+
     const rows = [];
     if (direct)
       direct.rows.forEach((row) =>
@@ -128,7 +191,17 @@ export const springs = {
         TE: orient(direct, treat1) * direct.TE,
         seTE: direct.seTE,
       });
-    routes.forEach((route) =>
+    // The routes are already in the order the flow decomposition found them,
+    // so the ones that go when there is no room for them are the ones carrying
+    // least. A row that will not fit is not drawn small, it is left out and
+    // said to be left out, because a coil crushed into ten pixels is not a
+    // spring and cannot be read as one.
+    const roomFor = Math.max(
+      1,
+      Math.floor(((box?.bottom ?? height) - Math.max(26, height * 0.08) - top) / 24) - rows.length - 1
+    );
+    const shownRoutes = routes.slice(0, Math.max(0, roomFor));
+    shownRoutes.forEach((route) =>
       rows.push({
         kind: "route",
         label: route.treatments.map((t) => shortLabel(t, 10)).join(" → "),
@@ -145,11 +218,6 @@ export const springs = {
       seTE: model.seTE[a][b],
     });
 
-    // The first row sits below the axis caption, and the last one above the
-    // axis labels. Both were pixel constants for a canvas the height of a
-    // window; on a panel a few hundred pixels tall they left the rows stacked
-    // on top of one another.
-    const top = Math.max(52, Math.min(158, height * 0.22));
     const floor = (box?.bottom ?? height) - Math.max(26, height * 0.08);
     const gap = Math.min(54, (floor - top) / Math.max(1, rows.length));
     const nullAt = at(0);
@@ -225,10 +293,12 @@ export const springs = {
           body = row.links
             .map((link) => {
               const next = cursor + link.TE * scale;
-              const path = coil(cursor, next, y, relative(link.seTE));
+              const wound = coil(cursor, next, y, relative(link.seTE));
               const joint = `<circle class="spring-joint" cx="${next}" cy="${y}" r="3"/>`;
               cursor = next;
-              return `<path class="spring-coil" d="${path}"/>${joint}`;
+              return `<path class="spring-coil" d="${
+                wound.d
+              }" stroke-width="${wound.gauge.toFixed(2)}"/>${joint}`;
             })
             .join("");
         } else if (held) {
@@ -236,10 +306,16 @@ export const springs = {
           // bundle is being held, which is the whole point: the further the
           // bundle is pulled from a precise study, the harder that study pulls
           // back, and precision is exactly how hard.
-          body = `<path class="spring-coil" d="${coil(at(row.TE), x, y, stiffness)}"/>
+          const wound = coil(at(row.TE), x, y, stiffness);
+          body = `<path class="spring-coil" d="${
+            wound.d
+          }" stroke-width="${wound.gauge.toFixed(2)}"/>
             <circle class="spring-anchor" cx="${at(row.TE)}" cy="${y}" r="2.6"/>`;
         } else {
-          body = `<path class="spring-coil" d="${coil(nullAt, x, y, stiffness)}"/>`;
+          const wound = coil(nullAt, x, y, stiffness);
+          body = `<path class="spring-coil" d="${
+            wound.d
+          }" stroke-width="${wound.gauge.toFixed(2)}"/>`;
         }
 
         const grabbable = row.kind === "pooled" && rig;
@@ -361,7 +437,12 @@ export const springs = {
           The routes drawn here are the ones the evidence actually travels, in the order the flow
           decomposition finds them. The stiffest carries ${
             routes[0] ? percent(routes[0].share, 1) : "–"
-          } of the estimate.
+          } of the estimate.${
+            routes.length > shownRoutes.length
+              ? ` ${routes.length - shownRoutes.length} more carry less and are left off the
+                 screen for want of room.`
+              : ""
+          }
         </p>
       </section>
     `;

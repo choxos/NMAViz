@@ -1708,12 +1708,15 @@ input[type="range"] {
   letter-spacing: 0.02em;
 }
 
+/* The wire gauge is a property of the spring, not of the stylesheet: a stiff
+   spring is wound from thicker wire, so the width comes in on the element. */
 .spring-coil {
   fill: none;
   stroke: var(--neutral-edge);
-  stroke-width: 1.6;
+  stroke-linecap: round;
   stroke-linejoin: round;
 }
+
 
 .spring-interval {
   stroke: var(--line);
