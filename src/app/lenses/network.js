@@ -11,7 +11,7 @@
 import { effect, escape, number, percent } from "../ui.js";
 import { arc, contrastEmphasis, drawNodes, hit, nodeRadii, scaleBetween, strandsOf } from "./draw.js";
 import { resistorPath, sourceBranch } from "./circuitry.js";
-import { cablePath, plugMarkup, socketMarkup } from "./props.js";
+import { switchMarkup } from "./props.js";
 import { evidenceFlow } from "../../nma/flow.js";
 
 function edgeGeometry(context) {
@@ -184,10 +184,10 @@ function circuit(context, geometry, emphasis) {
   // On a large network a resistor on every wire is a field of zigzags. Above
   // this many comparisons the symbol is kept for the wires that carry the
   // current for the comparison being asked about, and the rest stay plain.
-  // An open circuit carries no current. The plug is the switch, and it is the
-  // real thing rather than a picture of one: pull it out and the wire is
+  // An open circuit carries no current. The switch on the source lead is the
+  // real thing rather than a picture of one: press it off and the branch is
   // broken, which is the same statement the arithmetic makes.
-  const powered = state.plug == null;
+  const powered = !state.openCircuit;
   const dense = model.direct.length > 26;
   const flowing = powered && state.contrast
     ? new Map(
@@ -272,48 +272,29 @@ function circuit(context, geometry, emphasis) {
     .join("");
 
   // The source is not evidence, so it is drawn outside the network and dashed.
+  // Its switch is kept out of that group and drawn last: it is the one thing on
+  // the canvas that is pressed rather than read, and a wire lying across it
+  // would take the press.
   let source = "";
+  let mains = "";
   if (state.contrast) {
     const a = context.points[model.index.get(state.contrast.treat1)];
     const b = context.points[model.index.get(state.contrast.treat2)];
     if (a && b) {
       const branch = sourceBranch(a, b, box);
-      // Where the plug is: in the socket, or hanging wherever it was dropped.
-      const seated = {
-        x: branch.mouth.x - branch.mouthDirection.x * 10,
-        y: branch.mouth.y - branch.mouthDirection.y * 10,
-      };
-      const at = powered
-        ? seated
-        : {
-            x: box.left + state.plug.u * (box.right - box.left),
-            y: box.top + state.plug.v * (box.bottom - box.top),
-          };
-      const facing = powered
-        ? branch.mouthDirection
-        : (() => {
-            const dx = branch.mouth.x - at.x;
-            const dy = branch.mouth.y - at.y;
-            const len = Math.hypot(dx, dy) || 1;
-            return { x: dx / len, y: dy / len };
-          })();
-      const reach = Math.hypot(seated.x - branch.cut.x, seated.y - branch.cut.y);
-
       source = `
         <g class="source${powered ? " live" : " off"}">
-          <path class="source-wire" d="${branch.live}"/>
-          <path class="source-wire stub" d="${branch.stub}"/>
-          <path class="cable" d="${cablePath(branch.cut, at, reach + 26)}"/>
+          <path class="source-wire" d="${branch.d}"/>
           ${branch.source}
-          ${socketMarkup(branch.mouth, branch.mouthDirection, powered)}
-          ${plugMarkup(at, facing)}
         </g>`;
+      mains = switchMarkup(branch.switchAt, branch.switchDirection, powered);
     }
   }
 
   return {
     stage: `<g class="source-layer">${source}</g><g class="wires">${wires}</g>
-      <g class="nodes">${drawNodes(context, { emphasis, radii: nodeRadii(model) })}</g>`,
+      <g class="nodes">${drawNodes(context, { emphasis, radii: nodeRadii(model) })}</g>
+      <g class="mains">${mains}</g>`,
     inspector: inspector(context),
     style: "circuit",
     controls: `
@@ -323,9 +304,9 @@ function circuit(context, geometry, emphasis) {
       </div>
       <div class="console-group">
         <span class="console-label">Mains</span>
-        <button type="button" class="deck-button${powered ? "" : " primary"}" data-plug="${
-          powered ? "out" : "in"
-        }">${powered ? "Pull the plug" : "Plug it back in"}</button>
+        <button type="button" class="deck-button${powered ? "" : " primary"}" data-switch="${
+          powered ? "off" : "on"
+        }">${powered ? "Switch it off" : "Switch it on"}</button>
         <span class="lamp${powered && state.contrast ? " lit" : ""}"></span>
       </div>
       <div class="console-group">

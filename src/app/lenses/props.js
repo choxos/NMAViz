@@ -1,14 +1,14 @@
-/* Things on the canvas you pick up.
+/* Things on the canvas you work with your hands.
  *
- * A switch that says ON is a claim about the model written as a widget. A plug
- * lying on the bench next to an empty socket is the same claim made out of the
+ * A label that says ON is a claim about the model written as text. A rocker
+ * switch sitting in the lead, pressed to OFF, is the same claim made out of the
  * thing itself, and it is better for one reason that has nothing to do with
- * charm: the reader can see the state without reading a word. An open circuit
- * carries no current, and a plug out of its socket IS an open circuit, so the
- * picture and the arithmetic agree without anyone having to be told.
+ * charm: the reader can see the state without reading a word, and can change it
+ * without being told how. An open circuit carries no current, and a switch
+ * broken open IS an open circuit, so the picture and the arithmetic agree.
  *
  * Every prop here controls something the model actually has a degree of freedom
- * in. The plug decides whether current is driven at all. The probes decide
+ * in. The switch decides whether current is driven at all. The probes decide
  * which pair of treatments the potential is measured across, which is the
  * comparison of interest the whole site is built around. The dropper decides
  * where a random walk is released, which changes the walk and not the drawing
@@ -17,78 +17,40 @@
 
 const round = (n) => n.toFixed(1);
 
-/* A cable with slack in it.
+/* The switch: an inline rocker in the source lead, the kind molded into the
+ * cable of a lamp.
  *
- * Drawn as a curve that sags away from the straight line between its ends, by
- * an amount that grows as the ends come together, because that is what a cable
- * of fixed length does. A taut cable and a coiled one look different and the
- * difference is the whole reason a reader believes the plug is a physical
- * object rather than an icon that moved.
+ * It is drawn in its own frame so that the printed word stays level whichever
+ * way the branch runs beneath it, and the body is opaque so that the wire it
+ * sits on visibly ends at its two faces. The word rides on the paddle rather
+ * than beside it, because the branch it sits on is short on a crowded network
+ * and a switch that needs room for a second panel of text would land on the
+ * treatment or on the source.
  */
-export function cablePath(from, to, length) {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const span = Math.hypot(dx, dy);
-  const slack = Math.max(0, length - span);
-  // Sag downward on the screen, which is where gravity is even in a diagram.
-  const droop = Math.min(70, 12 + slack * 0.55);
-  const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 + droop };
-  return `M${round(from.x)} ${round(from.y)}Q${round(mid.x)} ${round(mid.y)} ${round(to.x)} ${round(
-    to.y
-  )}`;
-}
-
-/* The socket: a body with two contacts in it, mounted on the wire that runs
- * into the treatment the current is driven into. */
-export function socketMarkup(at, direction, occupied) {
-  const px = -direction.y;
-  const py = direction.x;
-  const corner = (along, across) => ({
-    x: at.x + direction.x * along + px * across,
-    y: at.y + direction.y * along + py * across,
-  });
-
-  const body = [corner(-9, -11), corner(9, -11), corner(9, 11), corner(-9, 11)]
-    .map((p, i) => `${i ? "L" : "M"}${round(p.x)} ${round(p.y)}`)
-    .join("");
-
-  const contact = (across) => {
-    const a = corner(-4.5, across);
-    const b = corner(4.5, across);
-    return `<line x1="${round(a.x)}" y1="${round(a.y)}" x2="${round(b.x)}" y2="${round(b.y)}"/>`;
-  };
+export function switchMarkup(at, direction, closed) {
+  // A word printed upside down is worse than a switch mounted the other way
+  // round, and the body is symmetric, so a branch running to the left flips.
+  const flipped = direction.x < 0;
+  const facing = flipped ? { x: -direction.x, y: -direction.y } : direction;
+  const angle = (Math.atan2(facing.y, facing.x) * 180) / Math.PI;
+  // Which way along the wire the current would run, in the flipped frame.
+  const downstream = flipped ? -1 : 1;
+  // Pressed toward the network when the circuit is made and backed off toward
+  // the source when it is broken, so the paddle says which way current is let
+  // through. That also keeps the word OFF, the one a reader must be able to
+  // read, at the end away from the treatment and its label.
+  const side = closed ? downstream : -downstream;
 
   return `
-    <g class="socket${occupied ? " occupied" : " empty"}">
-      <path class="socket-body" d="${body}Z"/>
-      <g class="socket-contacts">${contact(-5)}${contact(5)}</g>
-    </g>`;
-}
-
-/* The plug: a body and two pins, pointing the way it would go in. */
-export function plugMarkup(at, direction) {
-  const px = -direction.y;
-  const py = direction.x;
-  const point = (along, across) => ({
-    x: at.x + direction.x * along + px * across,
-    y: at.y + direction.y * along + py * across,
-  });
-
-  const body = [point(-13, -10), point(1, -10), point(1, 10), point(-13, 10)]
-    .map((p, i) => `${i ? "L" : "M"}${round(p.x)} ${round(p.y)}`)
-    .join("");
-
-  const pin = (across) => {
-    const a = point(1, across);
-    const b = point(9.5, across);
-    return `<line x1="${round(a.x)}" y1="${round(a.y)}" x2="${round(b.x)}" y2="${round(b.y)}"/>`;
-  };
-
-  return `
-    <g class="plug" data-prop="plug">
-      <circle class="hit-node" cx="${round(at.x)}" cy="${round(at.y)}" r="24"/>
-      <path class="plug-body" d="${body}Z"/>
-      <g class="plug-pins">${pin(-5)}${pin(5)}</g>
+    <g class="rocker${closed ? " closed" : " open"}" data-switch="${
+      closed ? "off" : "on"
+    }" transform="translate(${round(at.x)} ${round(at.y)}) rotate(${angle.toFixed(1)})">
+      <rect class="hit-node" x="-32" y="-19" width="64" height="38"/>
+      <rect class="rocker-body" x="-22" y="-11" width="44" height="22" rx="6"/>
+      <rect class="rocker-paddle" x="${side * 10 - 10}" y="-8" width="20" height="16" rx="3.5"/>
+      <text class="rocker-label" x="${side * 10}" y="3" text-anchor="middle">${
+        closed ? "ON" : "OFF"
+      }</text>
     </g>`;
 }
 

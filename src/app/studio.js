@@ -847,7 +847,7 @@ function statusWords() {
     ["Sound", soundIsOn()],
     ["Random", state.model === "random"],
     // Whether anything is actually driven around the network right now.
-    ["Open circuit", state.plug != null],
+    ["Open circuit", state.openCircuit],
     // No study compared these two directly, so everything shown is indirect.
     ["Indirect only", Boolean(state.contrast) && !edge],
     ["Heterogeneous", Boolean(fit) && fit.I2 > 0.5],
@@ -957,16 +957,12 @@ function moveProp(event) {
   if (!at) return;
   carrying.moved = true;
 
-  if (carrying.kind === "plug") {
-    state.plug = clampPin(at);
-  } else {
-    carrying.at = at;
-    // A probe commits nothing while it travels. It names the treatment it
-    // would land on, and only a release decides. Refitting every lens each
-    // time the pointer crossed a node would make the whole screen flicker
-    // through questions nobody asked.
-    carrying.candidate = nearestTreatment(at, carrying.kind === "dropper" ? null : carrying.avoid);
-  }
+  carrying.at = at;
+  // A probe commits nothing while it travels. It names the treatment it would
+  // land on, and only a release decides. Refitting every lens each time the
+  // pointer crossed a node would make the whole screen flicker through
+  // questions nobody asked.
+  carrying.candidate = nearestTreatment(at, carrying.kind === "dropper" ? null : carrying.avoid);
 
   if (carryFrame) return;
   carryFrame = requestAnimationFrame(() => {
@@ -980,14 +976,6 @@ function endProp(event) {
   const { kind, moved, candidate, at: carriedAt } = carrying;
   carrying = null;
   document.querySelector("#stage").classList.remove("carrying");
-
-  if (kind === "plug") {
-    // Dropped close enough to its socket, a plug goes in. This is the only
-    // place on the canvas with a magnet, and it needs one: hunting for a
-    // pixel-exact seat is not a thing anyone enjoys twice.
-    if (moved && state.plug && nearSocket(state.plug)) state.plug = null;
-    return update({});
-  }
 
   if (kind.startsWith("trial:")) {
     const label = kind.slice(6);
@@ -1059,32 +1047,6 @@ function overTray(fraction) {
     y >= bounds.y - 10 &&
     y <= bounds.y + bounds.height + 10
   );
-}
-
-/* Whether a hanging plug is over its socket, in box fractions. */
-function nearSocket(plug) {
-  const seat = socketFraction();
-  if (!seat) return false;
-  const box = lastBox;
-  const dx = (plug.u - seat.u) * (box.right - box.left);
-  const dy = (plug.v - seat.v) * (box.bottom - box.top);
-  return Math.hypot(dx, dy) < 42;
-}
-
-/* Where the socket sits, read off the drawing rather than recomputed, so the
- * magnet cannot drift away from the thing it is snapping to. */
-function socketFraction() {
-  const socket = document.querySelector("#stage .socket");
-  const box = lastBox;
-  if (!socket || !box) return null;
-  const bounds = socket.getBBox?.();
-  if (!bounds) return null;
-  const x = bounds.x + bounds.width / 2;
-  const y = bounds.y + bounds.height / 2;
-  return {
-    u: (x - box.left) / Math.max(1, box.right - box.left),
-    v: (y - box.top) / Math.max(1, box.bottom - box.top),
-  };
 }
 
 /* ---- The springs rig -------------------------------------------------------
@@ -1467,7 +1429,7 @@ function pressKey(id) {
   if (id === "reset") {
     // Everything a reader can knock out of place, and nothing they chose on
     // purpose: the game, the data, the comparison and the model all stay.
-    update({ pins: {}, plug: null, wager: null, separation: 0, paused: false });
+    update({ pins: {}, openCircuit: false, wager: null, separation: 0, paused: false });
     if (state.excluded.length) setExcluded([]);
     return;
   }
@@ -1612,6 +1574,14 @@ function wire() {
       if (lens?.handleAction?.(populationAction.dataset.populationAction, app, state, () => update({}))) update({});
       return;
     }
+    // The rocker on the source lead and the deck button beside it are the same
+    // control, so they carry the same attribute and the state they would leave
+    // the circuit in. It is read before the lens buttons because the stage
+    // itself carries the lens it is drawing, so anything clicked on the canvas
+    // would otherwise be answered as a request for the game already running.
+    const switchTarget = event.target.closest("[data-switch]");
+    if (switchTarget) return update({ openCircuit: switchTarget.dataset.switch === "off" });
+
     const lensButton = event.target.closest("[data-lens]");
     if (lensButton) return update({ lens: lensButton.dataset.lens, selection: null });
 
@@ -1648,14 +1618,6 @@ function wire() {
 
     // Clicking a node or an edge on the canvas selects it; clicking a pair of
     // nodes in turn sets the comparison of interest.
-    const plugButton = event.target.closest("[data-plug]");
-    if (plugButton) {
-      if (plugButton.dataset.plug === "in") return update({ plug: null });
-      // Pulled by click rather than by hand, it lands a little below its
-      // socket, where it is plainly out and plainly still reachable.
-      const seat = socketFraction();
-      return update({ plug: clampPin({ u: (seat?.u ?? 0.5) - 0.05, v: (seat?.v ?? 0.5) + 0.16 }) });
-    }
 
     if (event.target.closest("[data-restore]")) return setExcluded([]);
 

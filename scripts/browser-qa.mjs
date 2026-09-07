@@ -29,6 +29,20 @@ try {
   await page.locator("#practice-answer").fill("1");
   await page.locator("#practice-form button").click();
   await page.locator(".practice-feedback.correct").waitFor();
+
+  // The mains switch. It sits on the canvas over the wires, so this proves both
+  // that it takes the press there and that the circuit state follows it.
+  const rockerWord = () => page.evaluate(() => document.querySelector(".rocker-label").textContent);
+  await page.locator("#stage .rocker").waitFor();
+  assert.equal(await rockerWord(), "ON");
+  await page.locator("#stage .rocker").click();
+  await page.locator(".source.off").waitFor();
+  assert.equal(await rockerWord(), "OFF");
+  assert.equal(await page.locator(".wire-current").count(), 0);
+  assert.equal(await page.locator("[data-switch].deck-button").innerText(), "Switch it on");
+  await page.locator("[data-switch].deck-button").click();
+  await page.waitForFunction(() => document.querySelectorAll(".source.off").length === 0);
+  assert.equal(await rockerWord(), "ON");
   await page.locator("#data-button").click();
   await page.locator('[role="dialog"]').waitFor();
   assert.equal(await page.evaluate(() => !!document.activeElement.closest('[role="dialog"]')), true);
@@ -159,7 +173,7 @@ try {
   await page.locator("#diagram-size").click();
   await page.screenshot({ path: `${output}/mobile.png`, fullPage: true });
   assert.deepEqual(errors, []);
-  console.log("Browser QA passed: nine lenses, practice feedback, modal keyboard focus, trial exclusion, four path methods, canonical routes, Hodge topology, diffusion solver, spring wager, four population families, MAIC, binary approximations, invalid JSON data, sampler cancellation, mobile expansion.");
+  console.log("Browser QA passed: nine lenses, practice feedback, mains switch, modal keyboard focus, trial exclusion, four path methods, canonical routes, Hodge topology, diffusion solver, spring wager, four population families, MAIC, binary approximations, invalid JSON data, sampler cancellation, mobile expansion.");
 } finally {
   await browser.close();
   await server.close();

@@ -10,8 +10,8 @@
  *
  * 1. Nothing in the shell scales the canvas. Every pointer gesture on this site
  *    reads the stage's own bounding box and divides by its client size, so an
- *    ancestor with a transform would break dragging, the plug, the probes and
- *    the springs at once. The body is sized in real units and the LCD is a real
+ *    ancestor with a transform would break dragging, the probes and the
+ *    springs at once. The body is sized in real units and the LCD is a real
  *    element of a real size.
  * 2. Every key does something the model actually has. A dead button in yellow
  *    plastic is the same fault as a slider that moves and changes nothing.

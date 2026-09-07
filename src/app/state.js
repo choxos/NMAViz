@@ -30,16 +30,17 @@ export const state = {
   options: {},
   separation: 0, // 0 is the network, 1 is the exploded study inventory
 
-  // The machine itself. Power is the mains switch on the shell, not the plug in
-  // the circuit: one turns the display off, the other opens the source branch.
+  // The machine itself. Power is the mains switch on the shell, not the rocker
+  // in the circuit: one turns the display off, the other opens the source
+  // branch.
   power: true,
   paused: false,
   // Treatments the reader has placed by hand, as fractions of the clear box so
   // that a pinned treatment stays where it was put when the window resizes.
   pins: {}, // treatment -> { u, v }
-  // Where the plug is. Seated in its socket by default; once pulled out it
-  // hangs at the box-relative point it was dropped, and the circuit is open.
-  plug: null, // null when seated, else { u, v }
+  // Whether the switch on the source lead is pressed off, which breaks the
+  // branch so that no current is driven through the network at all.
+  openCircuit: false,
   // Trials pulled out of the analysis, and the refit without them. This is the
   // one control on the site that changes the evidence rather than the question
   // or the drawing, so it is kept apart: the original fit stays in `fit` and is
@@ -121,7 +122,7 @@ export function load(dataset, rows) {
       selection: null,
       separation: 0,
       pins: {},
-      plug: null,
+      openCircuit: false,
       excluded: [],
       sensitivity: null,
       wager: null,
@@ -137,7 +138,7 @@ export function load(dataset, rows) {
       dataset,
       rows,
       pins: {},
-      plug: null,
+      openCircuit: false,
       excluded: [],
       sensitivity: null,
       wager: null,

@@ -358,77 +358,52 @@ input[type="range"] {
 
 /* ---- Props ----------------------------------------------------------------- */
 
-/* A plug, a socket, and the cable between them. The state of the circuit is
-   readable from the picture without a word of text: pins in, current flows. */
-.plug,
+/* The props are picked up, so they say so under the pointer. */
 .dropper,
 .probe {
   cursor: grab;
 }
 
-#stage.carrying .plug,
 #stage.carrying .dropper,
 #stage.carrying .probe {
   cursor: grabbing;
 }
 
-.plug-body {
+/* The rocker in the source lead. The state of the circuit is readable from the
+   picture without a word of text, and the word is printed anyway because that
+   is what is molded into the real ones. */
+.rocker {
+  cursor: pointer;
+}
+
+.rocker-body {
   fill: var(--surface);
   stroke: var(--brand);
   stroke-width: 1.7;
-  stroke-linejoin: round;
 }
 
-.plug-pins line {
+.rocker-paddle {
+  fill: var(--surface);
   stroke: var(--brand);
-  stroke-width: 2.6;
-  stroke-linecap: round;
+  stroke-width: 1.3;
 }
 
-.socket-body {
-  fill: var(--stage);
-  stroke: var(--brand);
-  stroke-width: 1.6;
-  stroke-linejoin: round;
+.rocker-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  fill: var(--brand);
 }
 
-.socket-contacts line {
-  stroke: var(--brand);
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  opacity: 0.5;
+/* Pressed off, the paddle goes solid and the word reverses out of it. The pair
+   is the same one the body already uses, so the word stays legible on a screen
+   of any color the shell offers. */
+.rocker.open .rocker-paddle {
+  fill: var(--brand);
 }
 
-/* An empty socket is the one thing on this canvas allowed to look like it
-   wants something. */
-.socket.empty .socket-body {
-  stroke-dasharray: 3 3;
-}
-
-.socket.empty .socket-contacts line {
-  opacity: 1;
-  stroke: var(--accent);
-}
-
-.cable {
-  fill: none;
-  stroke: var(--brand);
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  opacity: 0.75;
-}
-
-.source.off .cable {
-  stroke: var(--neutral-edge);
-  opacity: 0.5;
-}
-
-.source.off .plug-pins line {
-  stroke: var(--neutral-edge);
-}
-
-.source.off .plug-body {
-  stroke: var(--neutral-edge);
+.rocker.open .rocker-label {
+  fill: var(--surface);
 }
 
 /* The probes: which two treatments the potential is measured across. */
@@ -1613,8 +1588,10 @@ input[type="range"] {
 }
 
 /* An unpowered source is still drawn, because the question is still there; it
-   simply is not being put to the network. */
-.source.off {
+   simply is not being put to the network. The switch keeps its own weight: it
+   is the one thing on a dead branch a reader still has to be able to read. */
+.source.off .source-wire,
+.source.off .current-source {
   opacity: 0.28;
 }
 
