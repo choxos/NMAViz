@@ -158,3 +158,18 @@ test("the effect measure is read from the effect column, and defaults to the ide
   const or = readNetwork("id,treat1,treat2,lnOR,selnOR\nA,x,y,-0.42,0.19\nB,y,z,0.10,0.22");
   assert.equal(or.measure, "OR");
 });
+
+
+test("invalid arm domains and identities are refused before conversion", () => {
+  const continuous = (a) => `study,treatment,n,mean,sd\ns,A,${a}\ns,B,10,1,1`;
+  for (const a of ["10,2,-1", "0,2,1", "10.5,2,1", "10,,1", "10,2,"])
+    assert.throws(() => readNetwork(continuous(a)), /Line 2/);
+  for (const [event, n] of [[-1, 10], [11, 10], [1.5, 10], [1, 0], [1, 10.5]])
+    assert.throws(() => readNetwork(`study,treatment,n,event\ns,A,${n},${event}\ns,B,10,2`), /Line 2/);
+  for (const first of [",A,10,2", "s,,10,2", "s,B,10,2"])
+    assert.throws(() => readNetwork(`study,treatment,n,event\n${first}\ns,B,10,2`), /study|treatment|duplicate/i);
+  const valid = readNetwork("study,treatment,n,event\ns,A,10,0\ns,B,10,10");
+  assert.equal(valid.contrasts.length, 1);
+  assert.ok(Number.isFinite(valid.contrasts[0].TE));
+  assert.equal(readNetwork(continuous("10,2,0")).contrasts.length, 1);
+});

@@ -13,7 +13,7 @@
  * reader already has rather than a new statistic.
  */
 
-import { hodge } from "../../nma/hodge.js";
+import { hodge, hodgeRanking, sparseCyclic } from "../../nma/hodge.js";
 import { effect, escape, number, percent } from "../ui.js";
 import { arc, drawNodes, hit, scaleBetween } from "./draw.js";
 
@@ -25,6 +25,8 @@ const COMPONENTS = {
 
 function inspector(context, h, component) {
   const { measure, state } = context;
+  const ranking = hodgeRanking(context.model, h);
+  const sparse = state.options.hodgeSparse === "show" ? sparseCyclic(h) : null;
   const share = (part) => (h.energyResidual > 1e-12 ? part / h.energyResidual : 0);
 
   const pills = Object.entries(COMPONENTS)
@@ -71,6 +73,7 @@ function inspector(context, h, component) {
       } across ${h.edges.length} comparisons</p>
     </header>
 
+    ${h.omittedZeroInformation ? `<p class="inspector-note">${h.omittedZeroInformation} comparison(s) have zero adjusted information and are omitted from this weighted graph, including its triangle and cycle counts. Their original study data remain in the analysis.</p>` : ""}
     <dl class="estimates">
       <div>
         <dt>Between comparisons</dt>
@@ -91,6 +94,12 @@ function inspector(context, h, component) {
     </dl>
 
     <section class="inspector-section">
+      <h3>Challenge: find the invisible disagreement</h3>
+      <p class="inspector-note">Load the four-cycle. Predict whether any triangle check can see its nonzero loop sum. Then add the A-C chord and compare harmonic dimension and curl energy. The chord changes what is detectable; it does not guarantee agreement.</p>
+      <div class="pills"><button type="button" data-hodge-example="cycle">Load four-cycle</button><button type="button" data-hodge-example="chord">Add A-C chord</button></div>
+      <p class="inspector-note">Harmonic dimension: ${h.harmonicDimension}. Curl energy: ${number(h.energyCurl, 3)}. Harmonic energy: ${number(h.energyHarmonic, 3)}.</p>
+    </section>
+    <section class="inspector-section">
       <h3>Show</h3>
       <div class="pills">${pills}</div>
       <p class="inspector-note">
@@ -103,8 +112,7 @@ function inspector(context, h, component) {
           h.harmonicDimension === 0
             ? `This network has no long-loop inconsistency to find, and that is a fact about its
                shape rather than about its data. The space such disagreement would live in has
-               dimension zero here, so every loop of four treatments or more has a shortcut across
-               it and checking the triangles checks everything. Most published networks are like
+               dimension zero here, so triangle boundaries span the cycle space and checking the triangles checks everything. Most published networks are like
                this; the reading matters for the ones that are not.`
             : `The space of long-loop inconsistency has dimension ${h.harmonicDimension} on this
                network, so there are ${
@@ -139,6 +147,15 @@ function inspector(context, h, component) {
         : ""
     }
 
+    <section class="inspector-section">
+      <h3>Ranking laboratory</h3>
+      <p class="inspector-note">Higher numerical effect comes first here. This is a descriptive ranking exercise, not clinical benefit, a P-score, or a recommendation. Jiang's ordinary Borda equivalence requires complete, balanced binary preference data; the score extension below also accepts cardinal data.</p>
+      <table class="study-table"><thead><tr><th>Item</th><th>Gradient score</th><th>Weighted net score</th></tr></thead><tbody>${ranking.scores.sort((a, b) => b.gradient - a.gradient).map((s) => `<tr><td>${escape(s.treatment)}</td><td>${number(s.gradient, 3)}</td><td>${number(s.borda, 3)}</td></tr>`).join("")}</tbody></table>
+      <p class="inspector-note">${ranking.balancedComplete ? "Complete equal-weight graph: gradient and net-score orders coincide (ties allowed)." : "Incomplete or unequal-weight graph: net-score and Hodge orders need not agree."}</p>
+      <p class="inspector-note">${ranking.kemeny ? `Exact Kemeny-type order: ${ranking.kemeny.order.map(escape).join(" → ")}. Weighted squared sign-fit loss: ${number(ranking.kemeny.objective, 3)}. This minimizes the discrete sign model; ties return one optimum.` : "Exact Kemeny optimization is limited to 12 items; its exponential computation is not approximated silently."}</p>
+      <button type="button" data-option="hodgeSparse" data-value="${state.options.hodgeSparse === "show" ? "hide" : "show"}">${state.options.hodgeSparse === "show" ? "Hide" : "Compute"} sparse cyclic representative</button>
+      ${state.options.hodgeSparse === "show" ? sparse ? `<p class="inspector-note">Jiang §5.1: minimize ‖residual − curl*φ‖₁. L1 objective ${number(sparse.objective, 4)}; ${sparse.converged ? "converged" : "iteration limit; not certified converged"} after ${sparse.iterations} iterations; residual ${sparse.residual.toExponential(2)}. Sparse representatives need not be unique; this does not authorize dropping trials.</p><table class="study-table"><thead><tr><th>Comparison</th><th>Representative</th></tr></thead><tbody>${h.edges.map((e, i) => `<tr><td>${escape(e.treat1)} / ${escape(e.treat2)}</td><td>${number(sparse.values[i], 4)}</td></tr>`).join("")}</tbody></table>` : '<p class="inspector-note">Sparse solver limited to 100 comparisons.</p>' : ""}
+    </section>
     <p class="inspector-note">
       Computed on one pooled estimate per comparison, using the weights the model itself uses.
       Disagreement between studies of the same comparison is heterogeneity, not inconsistency,

@@ -123,6 +123,7 @@ export const springs = {
         (e.treat1 === treat1 && e.treat2 === treat2) ||
         (e.treat1 === treat2 && e.treat2 === treat1)
     );
+    const tau2 = (model.tau ?? 0) ** 2;
     const orient = (edge, from) => (edge.treat1 === from ? 1 : -1);
 
     // The routes through the network, from the flow decomposition, with the
@@ -148,6 +149,7 @@ export const springs = {
       model.TE[a][b],
       ...(direct ? [orient(direct, treat1) * direct.TE] : []),
       ...routes.map((r) => r.TE),
+      ...(direct?.rows ?? []).map((r) => r.TE),
     ].filter(Number.isFinite);
     const spread = Math.max(...values.map(Math.abs), 1e-6) * 1.35;
     // Room down the left for the row labels, and a smaller margin on the right
@@ -181,7 +183,8 @@ export const springs = {
           kind: "study",
           label: row.studlab,
           TE: orient(direct, treat1) * row.TE,
-          seTE: row.seTE,
+          seTE: Math.sqrt(row.seTE ** 2 + tau2),
+          samplingVariance: row.seTE ** 2,
         })
       );
     if (direct)
@@ -279,6 +282,14 @@ export const springs = {
     const drawn = rows
       .map((row, index) => {
         const y = top + index * gap;
+        // During prediction show only study anchors and the learner's stop.
+        // Neither pooled/network geometry nor a freely moving rig may reveal the answer.
+        if (hidden) {
+          if (row.kind !== "study") return "";
+          return `<g class="spring-row study"><title>${escape(row.label)}: ${effect(row.TE, row.seTE, measure)}</title>
+            <circle class="spring-anchor" cx="${at(row.TE)}" cy="${y}" r="5"/>
+            <text class="spring-label" x="${left}" y="${y - 13}">${escape(row.label)}: ${number(row.TE, 2)}, SE ${number(row.seTE, 2)}</text></g>`;
+        }
         const held = rig && (row.kind === "study" || row.kind === "pooled");
         const x = at(held ? rig.x : row.TE);
         const stiffness = relative(row.seTE);
@@ -306,11 +317,21 @@ export const springs = {
           // bundle is being held, which is the whole point: the further the
           // bundle is pulled from a precise study, the harder that study pulls
           // back, and precision is exactly how hard.
-          const wound = coil(at(row.TE), x, y, stiffness);
-          body = `<path class="spring-coil" d="${
-            wound.d
-          }" stroke-width="${wound.gauge.toFixed(2)}"/>
-            <circle class="spring-anchor" cx="${at(row.TE)}" cy="${y}" r="2.6"/>`;
+          const anchor = at(row.TE);
+          if (row.kind === "study" && tau2 > 0) {
+            // Equal series force allocates extension in proportion to compliance.
+            const joint = anchor + (x - anchor) * row.samplingVariance / (row.samplingVariance + tau2);
+            const sampling = coil(anchor, joint, y, relative(Math.sqrt(row.samplingVariance)));
+            const heterogeneity = coil(joint, x, y, relative(Math.sqrt(tau2)));
+            body = `<path class="spring-coil" d="${sampling.d}" stroke-width="${sampling.gauge}"/>
+              <circle class="spring-joint" cx="${joint}" cy="${y}" r="3"/>
+              <path class="spring-coil heterogeneity" d="${heterogeneity.d}" stroke="var(--accent, #a85e2d)" stroke-dasharray="3 2" stroke-width="${heterogeneity.gauge}"><title>Zero natural-length heterogeneity spring: compliance τ² = ${number(tau2, 3)}</title></path>
+              <circle class="spring-anchor" cx="${anchor}" cy="${y}" r="2.6"/>`;
+          } else {
+            const wound = coil(anchor, x, y, stiffness);
+            body = `<path class="spring-coil" d="${wound.d}" stroke-width="${wound.gauge.toFixed(2)}"/>
+              <circle class="spring-anchor" cx="${anchor}" cy="${y}" r="2.6"/>`;
+          }
         } else {
           const wound = coil(nullAt, x, y, stiffness);
           body = `<path class="spring-coil" d="${
@@ -369,7 +390,7 @@ export const springs = {
       .map((row, index) => ({ row, index }))
       .filter(({ row }) => row.kind === "study" || row.kind === "pooled");
     const yoke =
-      rig && bundleRows.length > 1
+      rig && !hidden && bundleRows.length > 1
         ? `<line class="spring-yoke" x1="${at(rig.x)}" y1="${
             top + bundleRows[0].index * gap - 12
           }" x2="${at(rig.x)}" y2="${top + bundleRows[bundleRows.length - 1].index * gap + 12}"/>`
@@ -413,6 +434,9 @@ export const springs = {
 
       <section class="inspector-section">
         <h3>How the assembly settles</h3>
+        <p class="inspector-note">${tau2 > 0
+          ? `Each study now has a second, dashed spring in series with zero natural length and compliance τ² = ${number(tau2, 3)}. Series compliances add: se² + τ², so effective stiffness is 1/(se² + τ²). It softens precise studies most in relative terms; it adds no effect to their natural length.`
+          : "Switch to random effects to add a zero natural-length heterogeneity spring in series with every study. When τ² is zero the extra spring is rigid and changes nothing."}</p>
         <p class="inspector-note">
           A spring's natural length is an effect and its stiffness is a precision. Studies of the
           same comparison hang in parallel, so their stiffnesses add and the assembly settles at
@@ -454,8 +478,8 @@ export const springs = {
         ? `
           <div class="console-group">
             <span class="console-label">Assembly</span>
-            <button type="button" class="deck-button primary" data-play="pull">Pull and release</button>
-            <button type="button" class="deck-button" data-play="settle">Let it rest</button>
+            <button type="button" class="deck-button primary" data-play="pull"${hidden ? " disabled" : ""}>Pull and release</button>
+            <button type="button" class="deck-button" data-play="settle"${hidden ? " disabled" : ""}>Let it rest</button>
           </div>
           <div class="console-group">
             <span class="console-label">Wager</span>
@@ -488,7 +512,7 @@ export const springs = {
           </div>
           <div class="console-group">
             <span class="console-label">Energy stored</span>
-            <span class="deck-reading">${number(rigEnergy(rig), 2)}</span>
+            <span class="deck-reading">${hidden ? "hidden" : number(rigEnergy(rig), 2)}</span>
             <span class="console-label">at rest, ${
               context.state.model === "random" ? "Q&#8202;at these weights&#8202;/&#8202;2 =" : "Q&#8202;/&#8202;2 ="
             }</span>

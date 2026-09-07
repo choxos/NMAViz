@@ -8,7 +8,7 @@
  * little of it.
  */
 
-import { evidenceFlow, flowPaths } from "../../nma/flow.js";
+import { evidenceFlow, flowPaths, flowMeasures } from "../../nma/flow.js";
 import { effect, escape, number, percent } from "../ui.js";
 import {
   DEFS,
@@ -39,6 +39,7 @@ function inspector(context, flow, paths) {
     )
     .join("");
 
+  const measures = flowMeasures(model, flow.treat1, flow.treat2);
   const multiArm = model.narms.some((p) => p > 2);
 
   return `
@@ -57,17 +58,21 @@ function inspector(context, flow, paths) {
       </div>
       <div>
         <dt>Mean path length</dt>
-        <dd>${number(flow.meanPathLength, 2)} comparisons</dd>
+        <dd>${number(measures.meanPathLength, 2)} designs</dd>
       </div>
       <div>
-        <dt>Minimal parallelism</dt>
+        <dt>Design parallelism</dt>
         <dd>${
-          Number.isFinite(flow.minimalParallelism) ? number(flow.minimalParallelism, 2) : "–"
+          Number.isFinite(measures.designParallelism) ? number(measures.designParallelism, 2) : "–"
         } streams</dd>
       </div>
+      <div><dt>Study parallelism</dt><dd>${number(measures.studyParallelism, 2)} streams</dd></div>
     </dl>
 
     <section class="inspector-section">
+      <h3>Independent sources</h3>
+      <p class="inspector-note">Multi-arm sources count once through their clique net flow, half the sum of absolute treatment inflows. Parallelism is the reciprocal of the largest source flow (Koenig et al., sections 3.3.1 to 3.4).</p>
+      <table class="study-table"><thead><tr><th>${context.state.options.flowLevel === "study" ? "Study" : "Design"}</th><th>Net flow</th></tr></thead><tbody>${(context.state.options.flowLevel === "study" ? measures.studyFlows : measures.designFlows).map((source) => `<tr><td>${escape(source.name)}</td><td>${percent(source.flow, 1)}</td></tr>`).join("")}</tbody></table>
       <h3>Where the estimate comes from</h3>
       <table class="study-table">
         <thead><tr><th>Route</th><th class="numeric">Share</th></tr></thead>
@@ -103,6 +108,7 @@ export const flow = {
   spatial: true,
   separates: true,
   id: "flow",
+  deck: true,
   name: "Flow",
   tagline: "Where one estimate actually comes from",
   reference:
@@ -302,6 +308,7 @@ export const flow = {
         emphasis: contrastEmphasis(state),
       })}</g>${meter}`,
       inspector: inspector(context, flowNetwork, paths),
+      controls: `<div class="console-group"><span class="console-label">Source level</span>${["design", "study"].map((level) => `<button class="deck-button" type="button" data-option="flowLevel" data-value="${level}" aria-pressed="${(state.options.flowLevel ?? "design") === level}">${level === "design" ? "Designs" : "Studies"}</button>`).join("")}</div>`,
       note: `One unit of evidence enters at ${state.contrast.treat1} and leaves at ${state.contrast.treat2}. Arrow width is the share of the estimate travelling that way.`,
     };
   },

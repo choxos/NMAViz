@@ -1,0 +1,61 @@
+.practice {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent, var(--brand));
+  border-radius: 6px;
+  background: var(--wash);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.practice-heading { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; }
+.practice-heading h3 { margin: 0; font-size: 14px; }
+.practice-heading span { font-size: 11px; color: var(--muted); }
+.practice label { display: block; margin-bottom: 10px; }
+.practice-entry { display: flex; gap: 8px; align-items: stretch; }
+.practice-entry input { width: 90px; min-width: 0; }
+.practice input, .wager-field input, #population-data {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  padding: 8px;
+}
+.practice button, .view-tools button {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.practice-feedback { padding: 10px 0; margin: 0; }
+.practice-feedback.correct { font-weight: 600; }
+.wager-field { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; font-size: 12px; }
+.wager-field input { width: 110px; }
+.view-tools { text-align: center; padding: 4px; }
+.view-tools button { font-size: 11px; }
+.game-bar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.population-mode .lcd-body { grid-template-columns: minmax(0, 1fr); }
+.population-mode .pads { display: none; }
+.manual [hidden], .readouts[hidden] { display: none !important; }
+.lcd-body.enlarged { overflow: auto; grid-template-columns: minmax(680px, 1fr) 70px; }
+.lcd-body.enlarged .stage { min-height: 440px; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible {
+  outline: 3px solid var(--accent, var(--brand));
+  outline-offset: 3px;
+}
+.inspector details { max-width: 100%; overflow: auto; }
+.inspector summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
+#population-data { width: 100%; min-height: 180px; font-family: ui-monospace, monospace; font-size: 11px; }
+@media (max-width: 640px) {
+  .lcd-body:not(.enlarged) { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(330px, 1fr) auto; }
+  .lcd-body:not(.enlarged) .readouts {
+    grid-column: 1; grid-row: 2; flex-direction: row; flex-wrap: wrap;
+    justify-content: space-between; border-left: 0; border-top: 1px solid var(--line); padding: 8px 0 0;
+  }
+  .lcd-body:not(.enlarged) .readouts dd { font-size: 11px; }
+  .practice-entry { flex-wrap: wrap; }
+  .manual button { min-height: 36px; }
+}

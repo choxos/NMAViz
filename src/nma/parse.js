@@ -262,7 +262,22 @@ function readArms(table, columns, measure) {
       arm.mean = asNumber(row[columns.mean], columns.mean, line);
       arm.sd = asNumber(row[columns.sd], columns.sd, line);
     }
+    if (!studlab || !arm.treatment)
+      throw new Error(`Line ${line} is missing a study or treatment name.`);
+    if (!Number.isSafeInteger(arm.n) || arm.n <= 0)
+      throw new Error(`Line ${line} needs a positive integer sample size.`);
+    if (kind === "binary") {
+      if (!Number.isSafeInteger(arm.event) || arm.event < 0 || arm.event > arm.n)
+        throw new Error(`Line ${line} needs an integer event count between zero and n.`);
+    } else {
+      if (!Number.isFinite(arm.mean) || !Number.isFinite(arm.sd) || arm.sd < 0)
+        throw new Error(`Line ${line} needs a finite mean and nonnegative standard deviation.`);
+      if (measure === "SMD" && arm.n < 2)
+        throw new Error(`Line ${line} needs at least two participants for a standardized mean difference.`);
+    }
     if (!byStudy.has(studlab)) byStudy.set(studlab, []);
+    if (byStudy.get(studlab).some(a => a.treatment === arm.treatment))
+      throw new Error(`Line ${line} duplicates treatment ${arm.treatment} in study ${studlab}.`);
     byStudy.get(studlab).push(arm);
   });
 

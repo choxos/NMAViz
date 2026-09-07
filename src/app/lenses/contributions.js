@@ -1,34 +1,15 @@
-/* Contributions.
- *
- * The flow lens says how much evidence travels along each comparison; this one
- * says how much of the estimate each comparison is responsible for, which is
- * not the same thing, because a long route uses several comparisons and the
- * credit has to be shared among them.
- *
- * Two published methods are shown together rather than one being chosen for the
- * reader. They usually agree closely, and where they do not, that disagreement
- * is itself the finding: it means several routes of the same length were
- * available and the shortest path method had to pick one.
- *
- * The second table pushes the same arithmetic down to individual studies, by
- * splitting each comparison's contribution among the studies on it in
- * proportion to their weights. That is the question a reader usually has:
- * not which comparison, but which trial.
- */
-
-import {
-  randomWalkContributions,
-  shortestPathContributions,
-} from "../../nma/contributions.js";
+import { CONTRIBUTION_METHODS, randomWalkContributions } from "../../nma/contributions.js";
 import { evidenceFlow } from "../../nma/flow.js";
 import { escape, percent } from "../ui.js";
 import { arc, contrastEmphasis, drawNodes, hit, scaleBetween, separable, strandsOf } from "./draw.js";
+
+const allocationPercent = (value) => percent(value, Math.abs(value) > 1e-9 && Math.abs(value) < 0.0005 ? 4 : 1);
 
 function studyShares(model, contributions) {
   const shares = [];
   for (const edge of model.direct) {
     const share = contributions.get(`${edge.treat1} ${edge.treat2}`) ?? 0;
-    if (share <= 1e-9) continue;
+    if (Math.abs(share) <= 1e-9) continue;
     const total = edge.rows.reduce((s, r) => s + 1 / r.seTE ** 2, 0);
     for (const row of edge.rows)
       shares.push({
@@ -37,7 +18,7 @@ function studyShares(model, contributions) {
         share: (share * (1 / row.seTE ** 2)) / total,
       });
   }
-  return shares.sort((a, b) => b.share - a.share);
+  return shares.sort((a, b) => Math.abs(b.share) - Math.abs(a.share));
 }
 
 function bar(label, primary, secondary, scale) {
@@ -46,20 +27,34 @@ function bar(label, primary, secondary, scale) {
     <div class="contribution">
       <div class="contribution-label">${label}</div>
       <div class="contribution-track">
-        <div class="contribution-fill" style="width:${(100 * primary) / scale}%"></div>
+        <div class="contribution-fill" style="width:${(100 * Math.abs(primary)) / scale}%;${primary < 0 ? "background:var(--negative, #b34465)" : ""}"></div>
         ${
           spread
             ? `<div class="contribution-tick" style="left:${
                 (100 * secondary) / scale
-              }%" title="Random walk: ${percent(secondary, 1)}"></div>`
+              }%" title="Random walk: ${allocationPercent(secondary)}"></div>`
             : ""
         }
       </div>
-      <div class="contribution-value">${percent(primary, 1)}</div>
+      <div class="contribution-value">${allocationPercent(primary)}</div>
     </div>`;
 }
 
-function inspector(context, shortest, walk) {
+const cache = new WeakMap();
+
+function selectedContributions(model, state, flow) {
+  const method = state.options?.contributionMethod ?? "shortestpath";
+  const descriptor = CONTRIBUTION_METHODS[method] ?? CONTRIBUTION_METHODS.shortestpath;
+  if (!cache.has(model)) cache.set(model, new Map());
+  const key = JSON.stringify([state.contrast.treat1, state.contrast.treat2, method]);
+  if (!cache.get(model).has(key)) {
+    try { cache.get(model).set(key, { values: descriptor.compute(flow, model.treatments.length), descriptor, method }); }
+    catch (error) { cache.get(model).set(key, { values: new Map(), descriptor, method, error: error.message }); }
+  }
+  return cache.get(model).get(key);
+}
+
+function inspector(context, shortest, walk, selected) {
   const { model, state } = context;
   const rows = model.direct
     .map((edge) => ({
@@ -68,14 +63,14 @@ function inspector(context, shortest, walk) {
       shortest: shortest.get(`${edge.treat1} ${edge.treat2}`) ?? 0,
       walk: walk.get(`${edge.treat1} ${edge.treat2}`) ?? 0,
     }))
-    .filter((r) => r.shortest > 1e-9 || r.walk > 1e-9)
+    .filter((r) => Math.abs(r.shortest) > 1e-9 || r.walk > 1e-9)
     .sort((a, b) => b.shortest - a.shortest);
 
-  const scale = Math.max(...rows.map((r) => Math.max(r.shortest, r.walk)), 0.01);
+  const scale = Math.max(...rows.map((r) => Math.max(Math.abs(r.shortest), r.walk)), 0.01);
   const disagreement = rows.reduce((s, r) => s + Math.abs(r.shortest - r.walk), 0) / 2;
 
   const studies = studyShares(model, shortest).slice(0, 10);
-  const studyScale = Math.max(...studies.map((s) => s.share), 0.01);
+  const studyScale = Math.max(...studies.map((s) => Math.abs(s.share)), 0.01);
 
   return `
     <header class="inspector-head">
@@ -84,24 +79,31 @@ function inspector(context, shortest, walk) {
         state.contrast.treat2
       )}</h2>
       <p class="inspector-scale">
-        ${rows.length} of ${model.direct.length} comparisons contribute anything at all.
+        ${selected.error ? "Allocation unavailable." : `${rows.length} of ${model.direct.length} comparisons carry an allocation under the selected rule or random walk.`}
       </p>
     </header>
 
     <section class="inspector-section">
+      <h3>Choose the allocation rule</h3>
+      <div class="pills">${Object.entries(CONTRIBUTION_METHODS).map(([id, method]) => `<button class="pill${id === selected.method ? " active" : ""}" data-option="contributionMethod" data-value="${id}" aria-pressed="${id === selected.method}">${method.label}</button>`).join("")}</div>
+      <p class="inspector-note">${escape(selected.descriptor.note)}</p>
+      ${selected.error ? `<p role="alert">${escape(selected.error)}</p>` : ""}
+      <p class="inspector-note">L1 and L2 enumerate all directed evidence paths, with limits of 5,000 paths and 150 active edges. An exceeded limit reports an error; it never substitutes another method. L1 uses a convex solver and can differ from the paper's equally optimal cccp allocation.</p>
+    </section>
+    ${selected.error ? "" : `<section class="inspector-section">
       <h3>By comparison</h3>
       <div class="contributions">${rows
         .map((r) => bar(r.label, r.shortest, r.walk, scale))
         .join("")}</div>
       <p class="inspector-note">
-        Bars are the shortest path method. A tick marks the random walk answer where the two
+        Bars show the magnitude of the ${escape(selected.descriptor.label)} allocation; signed values are printed alongside. Negative allocations are colored red. A tick marks the random walk answer where the two
         differ by more than half a percentage point; together they disagree about
-        ${percent(disagreement, 1)} of the estimate.
+        ${allocationPercent(disagreement)} of the estimate.
       </p>
     </section>
 
     <section class="inspector-section">
-      <h3>By study</h3>
+      <h3>Descriptive split by study</h3>
       <div class="contributions">${studies
         .map((s) =>
           bar(
@@ -114,9 +116,9 @@ function inspector(context, shortest, walk) {
         .join("")}</div>
       <p class="inspector-note">
         Each comparison's contribution divided among the studies on it, in proportion to their
-        weights. This is what "which trials is this estimate resting on" means.
+        original inverse-variance weights. This descriptive split is not the covariance-aware study information share; use the bipartite lens for that quantity.
       </p>
-    </section>
+    </section>`}
   `;
 }
 
@@ -129,7 +131,7 @@ export const contributions = {
   name: "Contributions",
   tagline: "Which comparisons, and which trials, the estimate rests on",
   reference:
-    "Davies AL, Papakonstantinou T, Nikolakopoulou A, Ruecker G, Galla T. Network meta-analysis and random walks. Stat Med. 2022;41(12):2091-2114.",
+    "Rücker G et al. Shortest path or random walks? A framework for path weights in network meta-analysis. Stat Med. 2024;43:4287-4304. Davies AL et al. Network meta-analysis and random walks. Stat Med. 2022;41:2091-2114.",
   mark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg>',
 
   /* The point of this lens is that the two published methods can disagree
@@ -139,9 +141,12 @@ export const contributions = {
     const { model, state } = context;
     const network = evidenceFlow(model, state.contrast.treat1, state.contrast.treat2);
     if (!network) return null;
-    const shortest = shortestPathContributions(network);
+    const selected = selectedContributions(model, state, network);
+    const shortest = selected.values;
     const walk = randomWalkContributions(network, model.treatments.length);
-    const [treat1, treat2] = target.id.split(" ");
+    const edge = model.direct.find((edge) => `${edge.treat1} ${edge.treat2}` === target.id || `${edge.treat2} ${edge.treat1}` === target.id);
+    if (!edge) return null;
+    const { treat1, treat2 } = edge;
     const key = shortest.has(`${treat1} ${treat2}`) ? `${treat1} ${treat2}` : `${treat2} ${treat1}`;
     if (!shortest.has(key)) return null;
     const a = shortest.get(key) ?? 0;
@@ -150,13 +155,10 @@ export const contributions = {
       kicker: "Contribution",
       title: `${treat1} vs ${treat2}`,
       rows: [
-        ["Shortest path", percent(a, 1)],
-        ["Random walk", percent(b, 1)],
+        [selected.descriptor.label, allocationPercent(a)],
+        ["Random walk", allocationPercent(b)],
       ],
-      note:
-        Math.abs(a - b) > 0.02
-          ? "The two methods disagree here, which happens where several routes of equal length are available."
-          : "Share of the estimate this comparison is responsible for.",
+      note: selected.descriptor.note,
     };
   },
 
@@ -165,9 +167,10 @@ export const contributions = {
     if (!state.contrast) return { stage: "", inspector: "", note: "" };
 
     const flow = evidenceFlow(model, state.contrast.treat1, state.contrast.treat2);
-    const shortest = shortestPathContributions(flow);
+    const selected = selectedContributions(model, state, flow);
+    const shortest = selected.values;
     const walk = randomWalkContributions(flow, model.treatments.length);
-    const largest = Math.max(...shortest.values(), 1e-9);
+    const largest = Math.max(...[...shortest.values()].map(Math.abs), 1e-9);
     const fanned = state.separation > 0.02 && separable(model);
 
     const edges = model.direct
@@ -176,9 +179,9 @@ export const contributions = {
         const share = shortest.get(key) ?? 0;
         const a = points[model.index.get(edge.treat1)];
         const b = points[model.index.get(edge.treat2)];
-        const carrying = share > 1e-6;
+        const carrying = Math.abs(share) > 1e-6;
         const stroke = (value) =>
-          carrying ? scaleBetween(value, 0, largest, 1.8, 13).toFixed(2) : "1";
+          carrying ? scaleBetween(Math.abs(value), 0, largest, 1.8, 13).toFixed(2) : "1";
         // A comparison's contribution is divided among its studies in
         // proportion to their weights, which is the arithmetic the second
         // table below already reports. Opening the separation control puts
@@ -194,7 +197,7 @@ export const contributions = {
                       strand.row.studlab
                     )}" d="${strand.path}" stroke-width="${stroke(share * strand.share)}"><title>${
                       escape(strand.row.studlab)
-                    }: ${percent(share * strand.share, 1)}</title></path>`
+                    }: ${allocationPercent(share * strand.share)}</title></path>`
                 )
                 .join("")
             : "";
@@ -202,9 +205,9 @@ export const contributions = {
           <g class="contribution-edge${carrying ? "" : " idle"}${
             parallel ? " fanned" : ""
           }" data-edge="${escape(key)}">
-            <title>${escape(edge.treat1)} vs ${escape(edge.treat2)}: ${percent(share, 1)}</title>
+            <title>${escape(edge.treat1)} vs ${escape(edge.treat2)}: ${allocationPercent(share)}</title>
             ${hit(arc(a, b))}
-            <path d="${arc(a, b)}" stroke-width="${stroke(share)}"/>
+            <path d="${arc(a, b)}" stroke-width="${stroke(share)}" ${share < 0 ? 'stroke-dasharray="5 4" style="stroke:var(--negative, #b34465)"' : ""}/>
             ${parallel}
           </g>`;
       })
@@ -214,10 +217,10 @@ export const contributions = {
       stage: `<g class="contribution-edges">${edges}</g><g class="nodes">${drawNodes(context, {
         emphasis: contrastEmphasis(state),
       })}</g>`,
-      inspector: inspector(context, shortest, walk),
-      note: `Line width is the share of the ${escape(state.contrast.treat1)} versus ${escape(
+      inspector: inspector(context, shortest, walk, selected),
+      note: selected.error ? escape(selected.error) : `Line width is the magnitude of the ${escape(selected.descriptor.label)} allocation to the ${escape(state.contrast.treat1)} versus ${escape(
         state.contrast.treat2
-      )} estimate that each comparison is responsible for. The shares add to one.${
+      )} estimate that each comparison is responsible for. Signed allocations add to one; negative L2 allocations are dashed and are not probabilities.${
         fanned
           ? " Each comparison is fanned into the studies on it, splitting its share by their weights."
           : ""

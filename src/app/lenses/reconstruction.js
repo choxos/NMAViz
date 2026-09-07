@@ -118,7 +118,7 @@ export const reconstruction = {
 
     const finalY = top + walk.length * gap + 24;
 
-    // A caption centred on the total runs off the drawing when the total sits
+    // A caption centered on the total runs off the drawing when the total sits
     // near one end of the axis, which on a panel means the last few characters
     // are simply cut off. Near an edge it hangs from that edge instead.
     const totalLabelAnchor =
@@ -242,6 +242,22 @@ export const reconstruction = {
           <dd>${number(projection.total, 6)}</dd>
         </div>
       </dl>
+
+      <section class="inspector-section">
+        <h3>Canonical route ledger</h3>
+        <p class="inspector-note">Direct evidence is allocated first. Remaining treatment balances use the largest feasible transfer; study-labelled routes are then extracted by largest bottleneck, with fixed label ordering for ties.</p>
+        <p>${projection.paths.length} indirect routes · ${percent(projection.indirect.weight, 1)} total weight</p>
+        ${projection.paths.map((path, i) => `<details>
+          <summary>Route ${i + 1}: ${percent(path.weight, 1)} · contribution ${number(path.contribution, 4)}</summary>
+          <ol>${path.edges.map(edge => `<li>${escape(edge.from)} → ${escape(edge.to)} · ${escape(edge.studlab)}: ${number(edge.estimate, 4)}</li>`).join("")}</ol>
+          <p class="inspector-note">Route contrast ${number(path.estimate, 4)} × weight ${number(path.weight, 4)} = ${number(path.contribution, 4)} on the analysis scale.</p>
+        </details>`).join("")}
+        <p class="inspector-note">${projection.pathResidual < 1e-8 ? "All residual study-edge coefficients exhausted." : `Unexhausted residual coefficient: ${projection.pathResidual.toExponential(3)}. Complete path decomposition is unavailable for this covariance geometry.`}</p>
+        <p class="inspector-note">Direct plus route sum: ${number(projection.canonicalTotal, 8)}.
+          Effect reconstruction residual (network minus this sum): ${projection.effectResidual.toExponential(3)} on the analysis scale.
+          ${Math.abs(projection.effectResidual) <= 1e-10 * Math.max(1, Math.abs(projection.total), Math.abs(projection.canonicalTotal)) ? "The effect sum agrees within numerical precision." : "These routes do not exactly reconstruct the fitted effect; rounded within-study nonclosure or unexhausted edges leave the reported residual."}
+        </p>
+      </section>
 
       <section class="inspector-section">
         <h3>What each trial did</h3>

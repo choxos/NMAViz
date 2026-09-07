@@ -36,8 +36,12 @@ import { eigenSymmetric, multiply, pseudoinverseSymmetric, transpose, zeros } fr
 
 /* Every set of three treatments that are all directly compared with each
  * other. These are the loops a triangle-by-triangle check can see. */
-export function triangles(model) {
-  const present = new Set(model.direct.map((e) => `${e.treat1}|${e.treat2}`));
+export function triangles(model, edges) {
+  if (!edges) {
+    const aggregate = edgeWeights(model);
+    edges = model.direct.filter((e) => aggregate.get(`${e.treat1} ${e.treat2}`) > 0);
+  }
+  const present = new Set(edges.map((e) => `${e.treat1}|${e.treat2}`));
   const has = (a, b) =>
     present.has(`${a}|${b}`) || present.has(`${b}|${a}`);
   const found = [];
@@ -65,7 +69,10 @@ function rank(A, tolerance = 1e-9) {
 }
 
 export function hodge(model) {
-  const edges = model.direct;
+  const aggregate = edgeWeights(model);
+  // A redundant multi-arm contrast may legitimately have zero adjusted
+  // information. It is absent from this weighted graph, including its topology.
+  const edges = model.direct.filter((e) => aggregate.get(`${e.treat1} ${e.treat2}`) > 0);
   const m = edges.length;
   const n = model.treatments.length;
   const at = (t) => model.index.get(t);
@@ -80,13 +87,13 @@ export function hodge(model) {
   // pooled on the studies' original standard errors, leaves a residual that is
   // not orthogonal to the consistency fit, and then the three parts no longer
   // decompose anything.
-  const aggregate = edgeWeights(model);
   const weight = edges.map((e) => aggregate.get(`${e.treat1} ${e.treat2}`) ?? 0);
   const totals = edges.map(() => 0);
   const position = new Map(edges.map((e, i) => [`${e.treat1} ${e.treat2}`, i]));
   model.rows.forEach((row, r) => {
     const forward = position.get(`${row.treat1} ${row.treat2}`);
     const index = forward ?? position.get(`${row.treat2} ${row.treat1}`);
+    if (index == null) return;
     const sign = forward != null ? 1 : -1;
     totals[index] += model.w[r] * sign * row.TE;
   });
@@ -98,7 +105,7 @@ export function hodge(model) {
   const residual = observed.map((y, i) => y - gradient[i]);
 
   // Curl operator on triangles, oriented i to j to k to i.
-  const loops = triangles(model);
+  const loops = triangles(model, edges);
   const signedIndex = (a, b) => {
     const forward = position.get(`${model.treatments[a]} ${model.treatments[b]}`);
     if (forward != null) return { index: forward, sign: 1 };
@@ -160,10 +167,19 @@ export function hodge(model) {
   // happens to be clean; the truth is that its shape has no room for the thing
   // being measured. Every network bundled with this site is of that kind.
   const rankOfCurl = loops.length ? rank(multiply(C, transpose(C))) : 0;
-  const harmonicDimension = Math.max(0, m - Math.max(0, n - 1) - rankOfCurl);
+  const component = Array.from({ length: n }, (_, i) => i);
+  edges.forEach((e) => {
+    const from = component[at(e.treat1)], to = component[at(e.treat2)];
+    for (let i = 0; i < n; i++) if (component[i] === to) component[i] = from;
+  });
+  const componentCount = new Set(component).size;
+  const harmonicDimension = Math.max(0, m - n + componentCount - rankOfCurl);
 
   return {
     edges,
+    omittedZeroInformation: model.direct.length - edges.length,
+    componentCount,
+    curlAdjoint: loops.length ? transpose(C).map((row, e) => row.map((x) => x / weight[e])) : edges.map(() => []),
     observed,
     weight,
     gradient,
@@ -179,4 +195,86 @@ export function hodge(model) {
     energyCurl: energy(curl),
     energyHarmonic: energy(harmonic),
   };
+}
+
+/** A teaching network: a loop sum of three with no triangle to detect it. */
+export function hodgeCycleRows(chord = false) {
+  const rows = [["A", "B", 1], ["B", "C", 1], ["C", "D", 1], ["A", "D", 0]];
+  if (chord) rows.push(["A", "C", 2]);
+  return rows.map(([treat1, treat2, TE], i) => ({ studlab: `Cycle ${i + 1}`, treat1, treat2, TE, seTE: 1 }));
+}
+
+/** Descriptive score order: positive contrasts mean the first item scores higher.
+ * This is a ranking-data exercise, not a treatment recommendation or P-score. */
+export function hodgeRanking(model, decomposition = hodge(model)) {
+  const n = model.treatments.length;
+  const preference = zeros(n, n);
+  decomposition.edges.forEach((e, i) => {
+    const a = model.index.get(e.treat1), b = model.index.get(e.treat2);
+    preference[a][b] = decomposition.weight[i] * decomposition.observed[i];
+    preference[b][a] = -preference[a][b];
+  });
+  const scores = model.treatments.map((treatment, i) => ({
+    treatment,
+    gradient: model.TE[i].reduce((sum, value) => sum + value, 0) / n,
+    borda: preference[i].reduce((sum, value) => sum + value, 0),
+  }));
+  const weights = decomposition.weight;
+  const balancedComplete = weights.length === n * (n - 1) / 2 && weights.every((w) => Math.abs(w - weights[0]) < 1e-9 * Math.max(1, weights[0]));
+  // ponytail: exact subset optimization costs O(n² 2^n); larger graphs show scores only.
+  if (n > 12) return { scores, balancedComplete, kemeny: null, limit: 12 };
+  const size = 1 << n;
+  const best = new Float64Array(size).fill(-Infinity);
+  const last = new Int16Array(size).fill(-1);
+  best[0] = 0;
+  for (let mask = 1; mask < size; mask++) {
+    for (let bottom = 0; bottom < n; bottom++) {
+      if (!(mask & (1 << bottom))) continue;
+      const rest = mask ^ (1 << bottom);
+      let value = best[rest];
+      for (let above = 0; above < n; above++)
+        if (rest & (1 << above)) value += preference[above][bottom];
+      if (value > best[mask] + 1e-12) { best[mask] = value; last[mask] = bottom; }
+    }
+  }
+  const order = [];
+  for (let mask = size - 1; mask;) {
+    const bottom = last[mask];
+    order.unshift(model.treatments[bottom]);
+    mask ^= 1 << bottom;
+  }
+  const position = new Map(order.map((t, i) => [t, i]));
+  const objective = decomposition.edges.reduce((sum, e, i) => {
+    const sign = position.get(e.treat1) < position.get(e.treat2) ? 1 : -1;
+    return sum + weights[i] * (sign - decomposition.observed[i]) ** 2;
+  }, 0);
+  return { scores, balancedComplete, kemeny: { order, objective }, limit: 12 };
+}
+
+/** Jiang section 5.1: an L1 representative modulo triangular curl.
+ * ADMM reports its residual; a stopped iteration is never labeled an optimum. */
+export function sparseCyclic(h, { tolerance = 1e-8, maxIterations = 4000 } = {}) {
+  const r = h.residual, A = h.curlAdjoint, m = r.length;
+  if (!h.triangleCount) return { values: [...r], objective: r.reduce((s, v) => s + Math.abs(v), 0), converged: true, iterations: 0, residual: 0 };
+  if (m > 100) return null;
+  const gram = multiply(A, transpose(A));
+  const projection = multiply(gram, pseudoinverseSymmetric(gram));
+  const scale = Math.max(1e-12, ...r.map(Math.abs));
+  const rho = 1 / scale;
+  let z = [...r], dual = r.map(() => 0), x = r.map(() => 0), error = Infinity, iterations = 0;
+  for (; iterations < maxIterations; iterations++) {
+    const target = r.map((v, i) => v - z[i] + dual[i]);
+    x = projection.map((row) => row.reduce((sum, v, i) => sum + v * target[i], 0));
+    const before = z;
+    z = r.map((v, i) => {
+      const value = v - x[i] + dual[i];
+      return Math.sign(value) * Math.max(0, Math.abs(value) - 1 / rho);
+    });
+    const primal = r.map((v, i) => v - x[i] - z[i]);
+    dual = dual.map((v, i) => v + primal[i]);
+    error = Math.max(...primal.map(Math.abs), ...z.map((v, i) => Math.abs(v - before[i])));
+    if (error <= tolerance * scale) break;
+  }
+  const values = r.map((v, i) => v - x[i]);
+  return { values, objective: values.reduce((sum, v) => sum + Math.abs(v), 0), converged: error <= tolerance * scale, iterations: Math.min(iterations + 1, maxIterations), residual: error };
 }

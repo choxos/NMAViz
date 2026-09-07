@@ -19,7 +19,7 @@
  * drawing on evidence a long way from the comparison being made.
  */
 
-import { diffusionMass, diffusionPartials, varianceFrom } from "../../nma/diffusion.js";
+import { absorbingWalk, diffusionEstimates, diffusionMass, diffusionPartials, varianceFrom } from "../../nma/diffusion.js";
 import { effect, escape, number, onScale, percent } from "../ui.js";
 import {
   arc,
@@ -57,10 +57,12 @@ export function originOf(state, model) {
 function series(context) {
   const { model, state, dataset } = context;
   const origin = originOf(state, model);
-  const key = `${dataset?.id}|${state.model}|${state.contrast?.treat1}|${origin}`;
-  if (cache.key !== key) {
+  const key = `${dataset?.id}|${state.model}|${state.contrast?.treat1}|${origin}|${state.options.solverFull}`;
+  if (cache.key !== key || cache.model !== model || cache.finish !== state.contrast?.treat2) {
     cache = {
-      key,
+      key, model, finish: state.contrast?.treat2,
+      solver: diffusionEstimates(model, { maxSteps: state.options.solverFull === "true" ? 2000 : STEPS, tolerance: 1e-10 }),
+      absorbing: absorbingWalk(model, state.contrast.treat1, state.contrast.treat2, STEPS),
       partials: diffusionPartials(model, STEPS),
       mass: diffusionMass(model, origin, STEPS),
     };
@@ -103,8 +105,8 @@ function inspector(context, step, partials) {
 
     <dl class="estimates">
       <div>
-        <dt>Accounted for so far</dt>
-        <dd>${Number.isFinite(se) ? effect(TE, se, measure) : "not yet defined"}</dd>
+        <dt>Square root of partial variance</dt>
+        <dd>${Number.isFinite(se) ? number(se, 4) : "not yet defined"}</dd>
       </div>
       <div>
         <dt>The whole series</dt>
@@ -129,7 +131,7 @@ function inspector(context, step, partials) {
         Each row is the part of this comparison's variance that walks of at most that many steps
         account for, so the figures rise to the network's own standard error rather than falling
         to it. The point estimate never moves; this is a decomposition of the uncertainty by how
-        far the evidence had to travel, not a sequence of better and better estimates.
+        far the evidence had to travel. Partial variances are not valid interim confidence intervals.
       </p>
     </section>
   `;
@@ -155,7 +157,8 @@ export const diffusionLens = {
     const { model, points, state, frame = 0 } = context;
     if (!state.contrast) return { stage: "", inspector: "", note: "" };
 
-    const { partials, mass } = series(context);
+    const { partials, mass, absorbing, solver } = series(context);
+    const mode = state.options.diffusionMode ?? "variance";
     // The walk runs on its own until the reader takes hold of it, at which
     // point they own the clock: a process worth watching is a process worth
     // stopping in the middle of.
@@ -165,7 +168,7 @@ export const diffusionLens = {
     const cycle = STEPS + 8;
     const step =
       held == null ? Math.min(STEPS, frame % cycle) : Math.max(0, Math.min(STEPS, Number(held)));
-    const here = mass[step];
+    const here = mode === "absorbing" ? absorbing.history[step] : mass[step];
     const largest = Math.max(...here, 1e-9);
     const radii = nodeRadii(model);
 
@@ -213,7 +216,7 @@ export const diffusionLens = {
       })
       .join("");
 
-    const origin = originOf(state, model);
+    const origin = mode === "absorbing" ? state.contrast.treat1 : originOf(state, model);
     const originPoint =
       context.carrying?.kind === "dropper" && context.carrying.at
         ? {
@@ -234,8 +237,9 @@ export const diffusionLens = {
           emphasis: contrastEmphasis(state),
           radii,
         })}</g>${dropperMarkup(originPoint, step === 0)}${calling}`,
-      inspector: inspector(context, step, partials),
+      inspector: mode === "variance" ? inspector(context, step, partials) : methodInspector(context, mode, step, absorbing, solver),
       controls: `
+        <div class="console-group"><span class="console-label">Experiment</span>${[["variance", "Variance"], ["estimates", "Estimate solver"], ["absorbing", "Absorbing walk"]].map(([value, label]) => `<button class="deck-button" type="button" data-option="diffusionMode" data-value="${value}" aria-pressed="${mode === value}">${label}</button>`).join("")}</div>
         <div class="console-group">
           <span class="console-label">Released at</span>
           <span class="deck-reading">${escape(origin)}</span>
@@ -266,8 +270,9 @@ export const diffusionLens = {
         <div class="console-group">
           <span class="console-label">Step</span>
           <span class="deck-reading">${step} of ${STEPS}</span>
-          <span class="console-label">Variance explained</span>
+          <span class="console-label">${mode === "absorbing" ? "Absorbed" : "Variance explained"}</span>
           <span class="deck-reading">${(() => {
+            if (mode === "absorbing") return percent(absorbing.history[step][model.index.get(state.contrast.treat2)], 1);
             const a = model.index.get(state.contrast.treat1);
             const b = model.index.get(state.contrast.treat2);
             const exact = model.seTE[a][b] ** 2;
@@ -277,7 +282,7 @@ export const diffusionLens = {
             );
           })()}</span>
         </div>`,
-      note: `A walker released at ${escape(origin)}, ${step} ${
+      note: mode === "absorbing" ? `Walkers start at ${escape(state.contrast.treat1)} and stay at ${escape(state.contrast.treat2)} when they arrive. Net crossings equal the evidence-flow hat coefficients, even though individual walkers can backtrack.` : `A walker released at ${escape(origin)}, ${step} ${
         step === 1 ? "step" : "steps"
       } in.${
         origin === state.contrast.treat1
@@ -289,3 +294,23 @@ export const diffusionLens = {
     };
   },
 };
+
+function methodInspector(context, mode, step, absorbing, solver) {
+  const { model, state } = context;
+  const a = model.index.get(state.contrast.treat1), b = model.index.get(state.contrast.treat2);
+  if (mode === "absorbing") return `<header class="inspector-head"><span class="inspector-kind">Absorbing random walk</span><h2>Reach ${escape(state.contrast.treat2)}</h2></header>
+    <dl class="estimates"><div><dt>Absorbed by step ${step}</dt><dd>${percent(absorbing.history[step][b], 1)}</dd></div><div><dt>Expected steps to absorption</dt><dd>${number(absorbing.expectedSteps, 2)}</dd></div></dl>
+    <section class="inspector-section"><h3>Expected visits before absorption</h3><table class="study-table"><tbody>${model.treatments.map((name, i) => `<tr><td>${escape(name)}</td><td>${number(absorbing.visits[i], 3)}</td></tr>`).join("")}</tbody></table>
+    <h3>Crossings until absorption</h3><table class="study-table"><thead><tr><th>Edge</th><th>Forward</th><th>Backward</th><th>Net = hat</th></tr></thead><tbody>${absorbing.crossings.map((edge) => `<tr><td>${escape(edge.treat1)} → ${escape(edge.treat2)}</td><td>${number(edge.forward, 3)}</td><td>${number(edge.backward, 3)}</td><td>${number(edge.net, 3)}</td></tr>`).join("")}</tbody></table><p class="inspector-note">The initial placement counts as a visit; the final arrival at the absorbing treatment does not. These expectations use the complete absorbing chain, not just the displayed animation steps. Davies et al. (2022), supplement F to G.</p></section>`;
+  const current = solver.history[state.options.solverFull === "true" ? solver.history.length - 1 : Math.min(step, solver.history.length - 1)];
+  const hats = model.rows.map((row, r) => {
+    const i = model.index.get(row.treat1), j = model.index.get(row.treat2);
+    return model.w[r] * (current.M[a][i] - current.M[a][j] - current.M[b][i] + current.M[b][j]);
+  });
+  return `<header class="inspector-head"><span class="inspector-kind">Iterative NMA solver</span><h2>Build the estimate</h2></header>
+    <dl class="estimates"><div><dt>At step ${current.step}</dt><dd>${effect(current.TE[a][b], null, context.measure)}</dd></div><div><dt>Exact network estimate</dt><dd>${effect(model.TE[a][b], null, context.measure)}</dd></div><div><dt>Transition remainder</dt><dd>${current.residual.toExponential(3)}</dd></div></dl>
+    <p class="inspector-note">${current.residual <= solver.tolerance ? "Converged to tolerance." : "Not converged to tolerance (1e-10). A step limit is not a convergence claim."} The geometric sum constructs the covariance C, hat matrix H = CW, and estimates H y without a matrix inverse. Ruecker et al. (2026), equations 3 and 4 and section 3.3.1.</p>
+    <button type="button" class="deck-button" data-option="solverFull" data-value="${state.options.solverFull === "true" ? "false" : "true"}">${state.options.solverFull === "true" ? "Return to animation steps" : "Solve to tolerance (up to 2000 steps)"}</button>
+    <table class="study-table"><thead><tr><th>Step</th><th>Estimate</th><th>Remainder</th></tr></thead><tbody>${solver.history.filter((row) => [0, 1, 2, 3, 5, 8, 13, 22].includes(row.step) || row.step === current.step).map((row) => `<tr><td>${row.step}</td><td>${effect(row.TE[a][b], null, context.measure)}</td><td>${row.residual.toExponential(2)}</td></tr>`).join("")}</tbody></table>
+    <h3>Iterative hat row at step ${current.step}</h3><table class="study-table"><thead><tr><th>Study contrast</th><th>Coefficient</th></tr></thead><tbody>${model.rows.map((row, r) => `<tr><td>${escape(row.studlab)}: ${escape(row.treat1)} → ${escape(row.treat2)}</td><td>${number(hats[r], 4)}</td></tr>`).join("")}</tbody></table>`;
+}

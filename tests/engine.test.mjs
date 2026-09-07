@@ -161,17 +161,8 @@ test("a zero standard error is refused rather than dividing by zero", () => {
   );
 });
 
-/* Cochran's Q, split by design.
- *
- * Checked against netmeta's own decomp.design rather than against this
- * implementation. The one network it does not match to machine precision is
- * Dong 2013, where several multi-arm studies share a design and netmeta's
- * within-design term is multivariate; the tolerance there is stated rather
- * than hidden, and the property that matters, that the two parts are
- * non-negative and add to the total, is checked exactly on every network.
- */
+/* The multivariate within-design projection matches netmeta for every fixture. */
 test("Q splits into within-design and between-design parts, as netmeta splits it", () => {
-  const looser = new Set(["dong2013"]);
   for (const name of names) {
     const fixture = load(name);
     const fit = fitNetwork(toRows(fixture.prepared));
@@ -185,7 +176,7 @@ test("Q splits into within-design and between-design parts, as netmeta splits it
       `${name}: the two parts do not add to the total`
     );
 
-    const tolerance = looser.has(name) ? 1e-3 : 1e-7;
+    const tolerance = 1e-7;
     assert.ok(
       Math.abs(fit.Qheterogeneity - decomp.Q[1]) < tolerance,
       `${name}: within-design Q is ${fit.Qheterogeneity}, netmeta says ${decomp.Q[1]}`
@@ -195,4 +186,78 @@ test("Q splits into within-design and between-design parts, as netmeta splits it
       `${name}: between-design Q is ${fit.Qinconsistency}, netmeta says ${decomp.Q[2]}`
     );
   }
+});
+
+
+function multiarm(studlab, means, variances) {
+  return means.flatMap((_, i) => means.slice(i + 1).map((__, offset) => {
+    const j = i + offset + 1;
+    return { studlab, treat1: "ABCD"[i], treat2: "ABCD"[j],
+      TE: means[i] - means[j], seTE: Math.sqrt(variances[i] + variances[j]) };
+  }));
+}
+
+test("reversing and relabeling multi-arm contrasts preserves estimates, uncertainty and source rows", () => {
+  const rows = [...multiarm("multi", [0, 1, 3, 6], [1, 2, 4, 8]),
+    { studlab: "ab", treat1: "A", treat2: "B", TE: 3, seTE: 1 }];
+  const fit = fitNetwork(rows);
+  for (const labels of ["ABCD", "DCBA"]) {
+    const rename = t => labels["ABCD".indexOf(t)];
+    const changed = rows.map((r, i) => ({ ...r,
+      treat1: rename(i % 2 ? r.treat1 : r.treat2),
+      treat2: rename(i % 2 ? r.treat2 : r.treat1), TE: i % 2 ? r.TE : -r.TE }));
+    const other = fitNetwork(changed);
+    for (const model of ["common", "random"]) {
+      for (const a of fit.treatments) for (const b of fit.treatments) {
+        const i = fit[model].index.get(a), j = fit[model].index.get(b);
+        const x = other[model].index.get(rename(a)), y = other[model].index.get(rename(b));
+        closeTo(other[model].TE[x][y], fit[model].TE[i][j], 1e-9, "oriented estimate");
+        closeTo(other[model].seTE[x][y], fit[model].seTE[i][j], 1e-9, "oriented SE");
+      }
+    }
+    closeTo(other.Q, fit.Q, 1e-9, "Q");
+    for (const row of other.rows) assert.deepEqual({ ...row, source: undefined },
+      { ...changed[row.source], source: undefined });
+  }
+});
+
+test("one design has no inconsistency, including unequal-variance multi-arm studies", () => {
+  for (const rows of [
+    [{ studlab: "1", treat1: "A", treat2: "B", TE: 0, seTE: 1 },
+      { studlab: "2", treat1: "B", treat2: "A", TE: -2, seTE: 1 }],
+    [...multiarm("1", [0, 1, 3], [1, 2, 10]), ...multiarm("2", [0, 4, 2], [10, 2, 1])],
+  ]) {
+    const fit = fitNetwork(rows);
+    closeTo(fit.Qheterogeneity, fit.Q, 1e-10, "within-design Q");
+    closeTo(fit.Qinconsistency, 0, 1e-10, "between-design Q");
+  }
+});
+
+test("incomplete, duplicated, and invalid covariance studies are refused", () => {
+  const valid = multiarm("trial", [0, 1, 3, 6], [1, 2, 4, 8]);
+  assert.throws(() => fitNetwork(valid.slice(0, 3)), /every pairwise/);
+  assert.throws(() => fitNetwork([valid[0], valid[0], valid[1]]), /duplicate/i);
+  const invalid = multiarm("trial", [0, 1, 3], [1, 1, 1]);
+  invalid[2].seTE = 10;
+  assert.throws(() => fitNetwork(invalid), /variance|covariance|weight/i);
+  const singular = multiarm("trial", [0, 1, 3], [1, 1, 1]);
+  [1, 1, 4].forEach((v, i) => singular[i].seTE = Math.sqrt(v));
+  assert.throws(() => fitNetwork(singular), /singular/i);
+  assert.throws(() => fitNetwork([{ ...valid[0], seTE: Infinity }]), /standard error/);
+  assert.throws(() => fitNetwork([{ ...valid[0], treat2: "A" }]), /itself/);
+});
+
+
+test("multi-arm effects must close every triangle, allowing three-decimal reporting precision", () => {
+  const rows = multiarm("incoherent", [0, 0, 0], [1, 1, 1]);
+  rows[2].TE = 3;
+  assert.throws(() => fitNetwork(rows), /incoherent.*inconsistent.*effects/i);
+  const rounded = multiarm("rounded", [0, 0.3334, 0.6668], [1, 1, 1]);
+  rounded.forEach(row => row.TE = Math.round(row.TE * 1000) / 1000);
+  assert.doesNotThrow(() => fitNetwork(rounded));
+  const reversed = rounded.map(row => ({ ...row, treat1: row.treat2,
+    treat2: row.treat1, TE: -row.TE }));
+  matrixCloseTo(fitNetwork(reversed).common.TE, fitNetwork(rounded).common.TE, 1e-10, "rounded orientation");
+  rounded[2].TE += 0.01;
+  assert.throws(() => fitNetwork(rounded), /inconsistent.*effects/i);
 });

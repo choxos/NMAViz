@@ -22,20 +22,9 @@
  * and then sum_k C_k is exactly the model's estimate and sum_k b_k is exactly
  * c, because both statements are just L^+ L c = c written out study by study.
  *
- * Two deliberate choices are worth stating.
- *
- * The coefficients use the weights the model itself fits with, including the
- * multi-arm variance adjustment, so the identity above holds against the
- * estimate the rest of the site shows. Wang's own development instead uses each
- * study's exact within-study covariance, which on a network with multi-arm
- * studies produces a slightly different fit from the one netmeta reports; that
- * is the reduce-dimension against reduce-weights choice, not a mistake in
- * either.
- *
- * The uncertainties, by contrast, use the true covariance between a study's
- * contrasts, because a multi-arm study can feed the direct and the indirect
- * part at the same time and those two parts are then correlated. Treating them
- * as independent would understate the disagreement between them.
+ * Reduced-weight and reduced-dimension GLS are equivalent for coherent complete
+ * multi-arm contrasts and their covariance. The covariance below includes the
+ * fitted heterogeneity and retains correlations between direct and indirect.
  */
 
 import { pseudoinverseSymmetric } from "./matrix.js";
@@ -50,15 +39,15 @@ import { pseudoinverseSymmetric } from "./matrix.js";
  *
  * where V is the matrix of contrast variances with zero on the diagonal.
  */
-export function studyCovariance(rows) {
+export function studyCovariance(rows, tau = 0) {
   const arms = [...new Set(rows.flatMap((r) => [r.treat1, r.treat2]))];
   const position = new Map(arms.map((t, i) => [t, i]));
   const V = arms.map(() => arms.map(() => 0));
   for (const row of rows) {
     const i = position.get(row.treat1);
     const j = position.get(row.treat2);
-    V[i][j] = row.seTE ** 2;
-    V[j][i] = row.seTE ** 2;
+    V[i][j] = row.seTE ** 2 + tau ** 2;
+    V[j][i] = row.seTE ** 2 + tau ** 2;
   }
   const ends = rows.map((row) => [position.get(row.treat1), position.get(row.treat2)]);
   return rows.map((rowP, p) =>
@@ -69,6 +58,71 @@ export function studyCovariance(rows) {
       return (V[i][l] - V[i][k] + V[j][k] - V[j][l]) / 2;
     })
   );
+}
+
+// Wang section 2.2: direct first, then maximum feasible endpoint transfer.
+// The fixed treatment ordering breaks exact ties independently of row order.
+export function canonicalEdges(balance, treatments, treat1, treat2, studlab) {
+  const supply = balance.map(x => Math.max(0, x));
+  const demand = balance.map(x => Math.max(0, -x));
+  const order = treatments.map((_, i) => i).sort((i, j) => treatments[i].localeCompare(treatments[j], "en"));
+  const edges = [];
+  const transfer = (i, j, weight, direct) => {
+    if (weight <= 1e-12) return;
+    edges.push({ from: treatments[i], to: treatments[j], studlab, weight, direct });
+    supply[i] -= weight;
+    demand[j] -= weight;
+  };
+  const a = treatments.indexOf(treat1), b = treatments.indexOf(treat2);
+  transfer(a, b, Math.min(supply[a], demand[b]), true);
+  while (true) {
+    let best = null;
+    for (const i of order) for (const j of order) {
+      const weight = Math.min(supply[i], demand[j]);
+      if (weight > 1e-12 && (!best || weight > best.weight)) best = { i, j, weight };
+    }
+    if (!best) break;
+    transfer(best.i, best.j, best.weight, false);
+  }
+  return edges;
+}
+
+// Widest path first; a sorted depth-first traversal of edges above the widest
+// threshold resolves ties by treatment and study label without enumerating paths.
+function studyPaths(edges, source, target, treatments) {
+  const residual = edges.filter(e => !e.direct).map(e => ({ ...e, remaining: e.weight }));
+  residual.sort((a, b) => a.to.localeCompare(b.to, "en") || a.studlab.localeCompare(b.studlab, "en") || a.from.localeCompare(b.from, "en"));
+  const paths = [];
+  while (true) {
+    const capacity = new Map(treatments.map(t => [t, 0]));
+    capacity.set(source, Infinity);
+    for (let i = 0; i < treatments.length - 1; i++) {
+      let changed = false;
+      for (const edge of residual) {
+        const candidate = Math.min(capacity.get(edge.from), edge.remaining);
+        if (candidate > capacity.get(edge.to)) { capacity.set(edge.to, candidate); changed = true; }
+      }
+      if (!changed) break;
+    }
+    const weight = capacity.get(target);
+    if (!(weight > 1e-12)) break;
+    const visit = (node, seen) => {
+      if (node === target) return [];
+      for (const edge of residual) {
+        if (edge.from !== node || edge.remaining < weight || seen.has(edge.to)) continue;
+        const next = visit(edge.to, new Set([...seen, edge.to]));
+        if (next) return [edge, ...next];
+      }
+      return null;
+    };
+    const route = visit(source, new Set([source]));
+    if (!route) break;
+    for (const edge of route) edge.remaining -= weight;
+    const estimate = route.reduce((s, e) => s + e.estimate, 0);
+    paths.push({ weight, estimate, contribution: weight * estimate,
+      edges: route.map(({ remaining, ...edge }) => edge) });
+  }
+  return { paths, pathResidual: residual.reduce((s, e) => s + e.remaining, 0) };
 }
 
 /* Signed, covariance-aware contributions of every study to one network
@@ -128,7 +182,15 @@ export function studyContributions(model, treat1, treat2) {
     if (target !== -1) d[target] = directWeight * sign;
     const direct = target === -1 ? 0 : directWeight * sign * rows[target].TE;
 
+    const edges = canonicalEdges(balance, model.treatments, treat1, treat2, studlab).map(edge => {
+      const index = rows.findIndex(row => (row.treat1 === edge.from && row.treat2 === edge.to) || (row.treat2 === edge.from && row.treat1 === edge.to));
+      if (index < 0) throw new Error("Canonical projection requires complete within-study contrasts.");
+      const sign = rows[index].treat1 === edge.from ? 1 : -1;
+      return { ...edge, estimate: sign * rows[index].TE };
+    });
+
     return {
+      edges,
       studlab,
       arms,
       rows,
@@ -141,7 +203,7 @@ export function studyContributions(model, treat1, treat2) {
       directWeight,
       observed: target === -1 ? null : sign * rows[target].TE,
       observedSe: target === -1 ? null : rows[target].seTE,
-      covariance: studyCovariance(rows),
+      covariance: studyCovariance(rows, model.tau),
     };
   });
 
@@ -174,9 +236,18 @@ export function studyContributions(model, treat1, treat2) {
     seTE: weight > 1e-9 ? Math.sqrt(Math.max(0, variance)) / weight : NaN,
   });
 
+  const pathDecomposition = studyPaths(studies.flatMap(study => study.edges), treat1, treat2, model.treatments);
+  const canonicalTotal = totalDirect + pathDecomposition.paths.reduce((sum, path) => sum + path.contribution, 0);
+  // Rounded within-study contrasts may not close exactly even when every
+  // canonical coefficient is exhausted. Preserve that effect-scale discrepancy.
+  const effectResidual = model.TE[a][b] - canonicalTotal;
+
   return {
     treat1,
     treat2,
+    ...pathDecomposition,
+    canonicalTotal,
+    effectResidual,
     studies: studies.sort((x, y) => Math.abs(y.contribution) - Math.abs(x.contribution)),
     total: totalDirect + totalIndirect,
     direct: part(weightDirect, totalDirect, varianceDirect),

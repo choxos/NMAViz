@@ -24,6 +24,7 @@
  */
 
 import { flowPaths } from "./flow.js";
+import { pathWeights } from "./path-weights.js";
 
 const key = (edge) => `${edge.comparison.treat1} ${edge.comparison.treat2}`;
 
@@ -114,11 +115,33 @@ export function randomWalkContributions(flow, treatmentCount) {
   return contributions;
 }
 
+export function optimizedPathContributions(flow, method) {
+  const result = pathWeights(flow, { method });
+  const contributions = new Map(flow.edges.map((e) => [key(e), 0]));
+  result.paths.forEach((path, p) => {
+    for (const i of path) {
+      const name = key(result.edges[i]);
+      contributions.set(name, contributions.get(name) + result.weights[p] / path.length);
+    }
+  });
+  return contributions;
+}
+
 export const CONTRIBUTION_METHODS = {
   shortestpath: {
     label: "Shortest path",
     compute: (flow) => shortestPathContributions(flow),
     note: "Take the shortest remaining route, drain it, repeat.",
+  },
+  l1: {
+    label: "L1 optimization",
+    compute: (flow) => optimizedPathContributions(flow, "l1"),
+    note: "Minimize absolute path weights subject to reproducing every current. The optimum is one and is generally nonunique.",
+  },
+  l2: {
+    label: "L2 pseudoinverse",
+    compute: (flow) => optimizedPathContributions(flow, "l2"),
+    note: "The unique minimum Euclidean norm solution can have negative path and edge weights. These are signed allocations, not probabilities.",
   },
   randomwalk: {
     label: "Random walk",

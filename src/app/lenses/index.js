@@ -13,6 +13,7 @@ import { springs } from "./springs.js";
 import { hodgeLens } from "./hodge.js";
 import { reconstruction } from "./reconstruction.js";
 import { bipartite } from "./bipartite.js";
+import { populationLens } from "./population.js";
 
 export const LENSES = [
   network,
@@ -23,4 +24,5 @@ export const LENSES = [
   hodgeLens,
   diffusionLens,
   springs,
+  populationLens,
 ];

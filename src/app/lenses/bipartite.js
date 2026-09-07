@@ -15,6 +15,7 @@
  * can identify depends on which treatments the blocks happen to contain.
  */
 
+import { bipartiteFlow } from "../../nma/bipartite.js";
 import { studyContributions } from "../../nma/projection.js";
 import { effect, escape, number, percent, shortLabel } from "../ui.js";
 import { contrastEmphasis, drawNodes, nodeRadii, scaleBetween } from "./draw.js";
@@ -128,6 +129,7 @@ export const bipartite = {
     const influence = new Map(
       projection?.studies.map((s) => [s.studlab, Math.abs(s.contribution)]) ?? []
     );
+    const flow = state.contrast ? bipartiteFlow(model, state.contrast.treat1, state.contrast.treat2) : null;
     const strongest = Math.max(...influence.values(), 1e-9);
 
     // A trial sits at the middle of the treatments it compares. Trials of the
@@ -160,9 +162,10 @@ export const bipartite = {
       .flatMap((trial) =>
         trial.arms.map((arm) => {
           const p = points[model.index.get(arm)];
-          return `<line class="arm${trial.arms.length > 2 ? " multi" : ""}"
+          const coefficient = flow?.studies.find((s) => s.studlab === trial.studlab)?.arms.find((a) => a.treatment === arm)?.coefficient ?? 0;
+          return `<line style="stroke-width:${1 + 6 * Math.abs(coefficient)}" class="arm${trial.arms.length > 2 ? " multi" : ""}"
             x1="${trial.x.toFixed(1)}" y1="${trial.y.toFixed(1)}"
-            x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}"/>`;
+            x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}"><title>${escape(trial.studlab)} / ${escape(arm)}: arm coefficient ${number(coefficient, 4)}; positive flows treatment to trial</title></line>`;
         })
       )
       .join("");
@@ -268,6 +271,20 @@ export const bipartite = {
           .join("")
       : "";
 
+    const quantitative = flow ? `<section class="inspector-section">
+      <h3>Arm information flow</h3>
+      <p class="inspector-note">Line width is absolute arm hat coefficient. Positive coefficients flow from treatment to trial; negative coefficients return to treatments. Every trial balances to zero; the source sends one unit and the target receives one. Net crossings are independently calculated from expected visits before absorption at the target. They equal the arm currents. These information coefficients do not depend on observed outcomes.</p>
+      <details><summary>Inspect all arm coefficients and net crossings</summary><table class="study-table"><thead><tr><th>Trial / arm</th><th>Signed coefficient</th><th>Net crossings</th></tr></thead><tbody>
+      ${flow.studies.map((trial) => trial.arms.map((arm) => `<tr><td>${escape(trial.studlab)} / ${escape(arm.treatment)}</td><td class="numeric" style="background:color-mix(in srgb, ${arm.coefficient >= 0 ? '#80bda0' : '#283d39'} ${Math.min(100, Math.abs(arm.coefficient) * 100)}%, white);color:${arm.coefficient < -.6 ? '#fff' : '#20332d'}">${number(arm.coefficient, 4)}</td><td class="numeric">${arm.netCrossings == null ? "—" : number(arm.netCrossings, 4)}</td></tr>`).join("")).join("")}
+      </tbody></table></details>
+      <h3>Fixed trial blocks</h3><p class="inspector-note">The signed shade table is Senn's coefficient view. Trial intercepts are fixed: shifting every outcome within one trial by the same amount cannot change a treatment contrast. Arm coefficients reconstruct ${number(flow.reconstructed, 4)} on the analysis scale.</p>
+      ${flow.supported ? `<p class="inspector-note">Eliminating trial intercepts gives diag(g) − gg′/Σg for each block. Maximum difference from the fitted information matrix: ${number(flow.blockError, 8)}.</p>
+      <h3>Two-step walk from ${escape(state.contrast.treat1)}</h3>
+      <p class="inspector-note">First choose a trial with P↑, then a treatment with P↓. P↑P↓ includes return hops; it is not the no-self-loop comparison walk.</p>
+      <details><summary>Inspect upward and downward probabilities</summary><table class="study-table"><thead><tr><th>Trial</th><th>P↑</th><th>P↓ to target</th></tr></thead><tbody>${flow.studies.map((trial, i) => `<tr><td>${escape(trial.studlab)}</td><td>${percent(flow.upward[model.index.get(state.contrast.treat1)][i], 1)}</td><td>${percent(flow.downward[i][model.index.get(state.contrast.treat2)], 1)}</td></tr>`).join("")}</tbody></table></details>
+      <p class="inspector-note">Two-step chance of reaching ${escape(state.contrast.treat2)}: ${percent(flow.projected[model.index.get(state.contrast.treat1)][model.index.get(state.contrast.treat2)], 1)}. ${flow.equalSplit ? "Two-arm contrasts identify only the sum of arm variances. This walk uses an equal split as an equivalent representation, not recovered original arm precision. Flow and estimates do not depend on that split." : "Arm variances are recovered from additive pairwise variances."}</p>` : `<p class="inspector-note">An independent-arm walk is unavailable: ${flow.studies.filter((s) => !s.supported).map((s) => escape(s.studlab)).join(", ")} has non-additive or nonpositive reconstructed arm variances. The signed hat coefficients above remain defined; no arm precisions have been invented.</p>`}
+      </section>` : "";
+    const trialControls = `<section class="inspector-section"><h3>Leave a trial out</h3><p class="inspector-note">Predict whether uncertainty grows before removing a trial, then compare both fitted results.</p><details><summary>Choose a trial to leave out or restore</summary>${placed.map((trial) => `<button type="button" class="deck-button" data-exclude-study="${escape(trial.studlab)}" aria-pressed="${left.has(trial.studlab)}">${left.has(trial.studlab) ? "Restore" : "Leave out"} ${escape(trial.studlab)}</button>`).join(" ")}</details></section>`;
     const inspector = `
       <header class="inspector-head">
         <span class="inspector-kind">Trials and designs</span>
@@ -307,7 +324,7 @@ export const bipartite = {
                  <tbody>${influential}</tbody>
                </table>
                <p class="inspector-note">
-                 Trial squares are shaded by how far they moved this comparison. A multi-arm trial
+                 Trial squares are shaded by outcome contribution, not information weight. This contribution can be zero even for a precise trial. A multi-arm trial
                  is drawn once, with an arm to each of its treatments, so it is visible as the
                  single correlated object it is.
                </p>
@@ -328,7 +345,7 @@ export const bipartite = {
           emphasis: contrastEmphasis(state),
           radii,
         })}</g>${trayMarkup}`,
-      inspector: `${sensitivityPanel(context, check)}${inspector}`,
+      inspector: `${sensitivityPanel(context, check)}${trialControls}${quantitative}${inspector}`,
       controls: state.excluded.length
         ? `
           <div class="console-group">

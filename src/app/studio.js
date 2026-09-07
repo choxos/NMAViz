@@ -18,6 +18,8 @@ import { beep, setSound, soundIsOn } from "./sound.js";
 import { ICONS, escape, number, percent, shortLabel } from "./ui.js";
 import examples from "../data/examples.json";
 import { readNetwork, MEASURES } from "../nma/parse.js";
+import { hodgeCycleRows } from "../nma/hodge.js";
+import { learningMarkup, answerPractice, nextPractice } from "./learning.js";
 
 /* Three themes, cycled by the one button: paper, night, and the instrument.
  *
@@ -117,6 +119,7 @@ function shell() {
         </div>
 
         <div class="console" id="console" hidden></div>
+        <div class="view-tools"><button type="button" id="diagram-size" aria-pressed="false">Enlarge diagram</button></div>
 
         <div class="band">CLASSICAL</div>
 
@@ -136,7 +139,7 @@ function shell() {
           <span class="decal-mouse" aria-hidden="true">${ICONS.network}</span>
           <span class="decal-name">LAB MOUSE</span>
           <span class="decal-title">NETWORK GAME</span>
-          <span class="decal-count">8&#8202;IN&#8202;1</span>
+          <span class="decal-count">${LENSES.length}&#8202;IN&#8202;1</span>
         </div>
       </div>
 
@@ -154,6 +157,7 @@ function shell() {
           </div>
         </header>
         <p class="manual-note" id="lens-note"></p>
+        <div id="learning"></div>
         <aside class="controls" id="controls"></aside>
         <aside class="inspector" id="inspector"></aside>
       </div>
@@ -260,6 +264,7 @@ function separationOf(model) {
 
 function renderControls() {
   const node = document.querySelector("#controls");
+  node.hidden = state.lens === "population";
   const model = activeModel();
   if (!model) {
     node.innerHTML = "";
@@ -339,6 +344,7 @@ const cells = (share, count = 10) =>
 
 function renderReadouts() {
   const node = document.querySelector("#readouts");
+  node.hidden = state.lens === "population";
   const fit = state.fit;
   if (!fit) {
     node.innerHTML = "";
@@ -367,20 +373,32 @@ function renderReadouts() {
  * long panel should not throw away their scroll position or the control they
  * are holding. */
 let overlayKey = null;
+let overlayReturnFocus = null;
 
 function renderOverlay() {
   const node = document.querySelector("#overlay");
   if (!state.panel) {
+    const wasOpen = !node.hidden;
     node.hidden = true;
     node.innerHTML = "";
     overlayKey = null;
+    document.querySelector("#handheld").inert = false;
+    document.querySelector("#manual").inert = false;
+    if (wasOpen && overlayReturnFocus?.isConnected) overlayReturnFocus.focus();
+    overlayReturnFocus = null;
     return;
   }
   const key = [state.panel, state.dataset?.id, state.dataset?.measure, state.error].join("\u0000");
   if (key === overlayKey) return;
+  if (node.hidden) overlayReturnFocus = document.activeElement;
   overlayKey = key;
   node.hidden = false;
   node.innerHTML = state.panel === "data" ? dataPanel() : aboutPanel();
+  node.querySelector('[role="dialog"]').setAttribute("aria-modal", "true");
+  node.querySelector("[data-close]").setAttribute("aria-label", "Close dialog");
+  document.querySelector("#handheld").inert = true;
+  document.querySelector("#manual").inert = true;
+  node.querySelector("[data-close]").focus();
 }
 
 /* What was made of an uploaded file, and the one thing the file cannot say.
@@ -503,16 +521,15 @@ function aboutPanel() {
       <div class="sheet-body">
         <section>
           <p class="sheet-note">
-            NMAViz fits the frequentist graph-theoretical network meta-analysis model in your
-            browser and then draws the same fitted model through the readings the methods
-            literature has proposed for it. Nothing is uploaded: the file is parsed, analyzed and
-            drawn on your own machine.
+            NMAViz fits a graph-theoretical network meta-analysis and explores its evidence through
+            linked visual methods. The separate Population laboratory fits editable individual and
+            aggregate data for population adjustment. Calculations and data stay in your browser.
           </p>
           <p class="sheet-note">
-            The engine is checked against the R package netmeta on six published networks, two of
-            them with multi-arm studies: the Laplacian and its pseudoinverse, the hat matrix, the
-            common and random effect estimates, the direct and indirect estimates, the direct
-            evidence proportion, Q and tau squared all agree to eight decimal places.
+            Regression checks compare the graph engine with netmeta on six published networks,
+            including multi-arm designs. Additional checks cover published path-weight results,
+            canonical projection, bipartite flow, and analytic population-model examples.
+            The README describes the tolerances and supported model assumptions.
           </p>
         </section>
         <section>
@@ -522,10 +539,10 @@ function aboutPanel() {
         <section>
           <h3>What this is not</h3>
           <p class="sheet-note">
-            It does not fit Bayesian models, rank treatments, produce SUCRA or rankograms, assess
-            risk of bias, or judge transitivity. Nothing here establishes transitivity, absence of
-            bias, or a clinically meaningful ranking: zero inconsistency is not evidence of
-            validity, and a large contribution is not evidence of quality.
+            Descriptive Hodge rankings and small population-model posterior experiments are learning
+            tools. They do not assess risk of bias, establish transitivity or provide a clinically
+            meaningful treatment ranking. Check model assumptions, integration error and inference
+            diagnostics; zero inconsistency does not establish validity.
           </p>
           <p class="sheet-note">
             Source, tests and the full account of the modeling choices are at
@@ -628,6 +645,23 @@ let lastBox = null;
 let lastPoints = null;
 let lastContext = null;
 
+function replaceMarkup(container, markup) {
+  const active = document.activeElement;
+  const inside = active && container.contains(active);
+  const values = inside && active.matches("input, textarea") ? active.value : null;
+  const data = inside ? Object.entries(active.dataset) : [];
+  container.innerHTML = markup;
+  if (!inside) return;
+  const replacement = [...container.querySelectorAll("button, input, select, textarea, summary, a[href]")]
+    .find((el) => el.tagName === active.tagName && (active.id ? el.id === active.id
+      : data.length ? data.every(([key, value]) => el.dataset[key] === value)
+        : el.textContent === active.textContent));
+  if (replacement) {
+    if (values !== null) replacement.value = values;
+    replacement.focus({ preventScroll: true });
+  }
+}
+
 function currentFraction(index) {
   if (!lastBox || !lastPoints?.[index]) return { u: 0.5, v: 0.5 };
   return {
@@ -645,6 +679,7 @@ function renderStage() {
   // words etched into the glass, which is exactly what these do.
   document.querySelector(".lcd")?.classList.toggle("dark", state.power === false);
   document.querySelector(".bench")?.classList.toggle("paused", Boolean(state.paused));
+  document.querySelector(".handheld")?.classList.toggle("population-mode", state.lens === "population");
   if (!model) {
     stage.innerHTML = "";
     inspector.innerHTML = "";
@@ -741,15 +776,32 @@ function renderStage() {
   }
   const reading = drawn.inspector ?? "";
   if (inspector.dataset.markup !== reading) {
+    const openSections = [...inspector.querySelectorAll("details[open]")].map((el) => el.querySelector("summary")?.textContent);
     inspector.dataset.markup = reading;
-    inspector.innerHTML = reading;
+    replaceMarkup(inspector, reading);
+    inspector.querySelectorAll("details").forEach((el) => {
+      if (openSections.includes(el.querySelector("summary")?.textContent)) el.open = true;
+    });
+  }
+  const learning = document.querySelector("#learning");
+  const lesson = learningMarkup(lens.id);
+  if (learning.dataset.markup !== lesson) {
+    learning.dataset.markup = lesson;
+    replaceMarkup(learning, lesson);
   }
 
   // The controls a lens offers for working its mechanism, rather than for
   // choosing what to look at. They sit on the deck under the canvas because
   // that is where the hands go.
   const deck = document.querySelector("#console");
-  const controls = drawn.controls ?? "";
+  let controls = drawn.controls ?? "";
+  if (state.lens === "springs" && state.wager && !state.wager.settled) {
+    controls += `<label class="wager-field" for="wager-value">Your predicted effect (analysis scale)
+      <input id="wager-value" type="number" step="any" value="${escape(state.wager.guess)}" /></label>`;
+  }
+  if (state.lens === "springs" && !rig && model.direct.some((edge) => edge.rows.length > 1)) {
+    controls += '<button type="button" data-spring-example>Try a comparison with multiple studies</button>';
+  }
   // A swinging assembly or a running walk redraws many times a second, and the
   // deck's readings change every frame. Replacing its markup while a button is
   // held would take that button out from under the pointer, so the press would
@@ -757,7 +809,7 @@ function renderStage() {
   // ever arrive. The rebuild waits until the hand is off.
   if (deck.dataset.markup !== controls && !deckHeld) {
     deck.dataset.markup = controls;
-    deck.innerHTML = controls;
+    replaceMarkup(deck, controls);
   }
   deck.hidden = !controls;
   const game = LENSES.findIndex((entry) => entry.id === lens.id) + 1;
@@ -765,7 +817,8 @@ function renderStage() {
     lens.name
   }`;
   document.querySelector("#lens-note").textContent = drawn.note ?? lens.tagline;
-  document.querySelector("#dataset-name").textContent = state.dataset?.name ?? "";
+  document.querySelector("#dataset-name").textContent = state.lens === "population"
+    ? "Separate population experiment" : state.dataset?.name ?? "";
 
   document
     .querySelectorAll(".game-key")
@@ -784,6 +837,7 @@ function renderStage() {
  * none of them is decoration.
  */
 function statusWords() {
+  if (state.lens === "population") return [["Power", state.power !== false], ["Sound", soundIsOn()], ["Local data", true]];
   const fit = state.fit;
   const edge = state.contrast
     ? directEdge(state.contrast.treat1, state.contrast.treat2)
@@ -966,7 +1020,7 @@ function endProp(event) {
 /* The treatment nearest a point, if one is near enough to have been meant.
  *
  * On a dense network the invisible hit areas overlap, so which node the reader
- * intended cannot be read off a hit test. The nearest centre within a generous
+ * intended cannot be read off a hit test. The nearest center within a generous
  * radius is the honest answer, and the drawing says out loud which one that is
  * before anything is committed.
  */
@@ -1161,6 +1215,7 @@ function endStop(event) {
 
 function startPull(event) {
   if (!rig) return false;
+  if (state.wager && !state.wager.settled) return false;
   if (!event.target.closest?.("[data-bob]")) return false;
   const value = valueAtPointer(event);
   if (value == null) return false;
@@ -1423,6 +1478,7 @@ function pressKey(id) {
 function pressPlay() {
   if (state.lens === "springs") {
     if (!rig) return beep("deny");
+    if (state.wager && !state.wager.settled) return beep("deny");
     if (rig.running) {
       stopRig();
       rig.running = false;
@@ -1501,7 +1557,19 @@ function pressPad(way) {
 function wire() {
   const app = document.querySelector("#app");
 
+  app.addEventListener("submit", (event) => {
+    if (event.target.id !== "practice-form") return;
+    event.preventDefault();
+    answerPractice(state.lens, new FormData(event.target).get("prediction"));
+    update({});
+  });
+
   app.addEventListener("click", (event) => {
+    if (event.target.closest("[data-spring-example]")) {
+      const edge = activeModel()?.direct.find((item) => item.rows.length > 1);
+      if (edge) update({ contrast: { treat1: edge.treat1, treat2: edge.treat2 }, wager: null });
+      return;
+    }
     const key = event.target.closest("[data-key]");
     if (key) return pressKey(key.dataset.key);
     const pad = event.target.closest("[data-pad]");
@@ -1509,6 +1577,41 @@ function wire() {
   });
 
   app.addEventListener("click", (event) => {
+    if (event.target.closest("[data-practice]")) {
+      nextPractice(state.lens);
+      return update({});
+    }
+    if (event.target.closest("#diagram-size")) {
+      const enlarged = document.querySelector(".lcd-body").classList.toggle("enlarged");
+      const button = document.querySelector("#diagram-size");
+      button.setAttribute("aria-pressed", String(enlarged));
+      button.textContent = enlarged ? "Fit diagram" : "Enlarge diagram";
+      renderStage();
+      return;
+    }
+    const exclude = event.target.closest("[data-exclude-study]");
+    if (exclude) {
+      const label = exclude.dataset.excludeStudy;
+      return setExcluded(state.excluded.includes(label)
+        ? state.excluded.filter((study) => study !== label) : [...state.excluded, label]);
+    }
+    const cycle = event.target.closest("[data-hodge-example]");
+    if (cycle) {
+      const chord = cycle.dataset.hodgeExample === "chord";
+      cachedLayout = { key: null };
+      shownKey = null;
+      shownPoints = null;
+      tween = null;
+      load({ id: `hodge-${chord}`, name: chord ? "Four-cycle with a chord" : "Chordless four-cycle",
+        measure: "MD", outcome: "Teaching example", source: "Constructed Hodge cycle", unit: "effect units" }, hodgeCycleRows(chord));
+      return;
+    }
+    const populationAction = event.target.closest("[data-population-action]");
+    if (populationAction) {
+      const lens = LENSES.find((item) => item.id === "population");
+      if (lens?.handleAction?.(populationAction.dataset.populationAction, app, state, () => update({}))) update({});
+      return;
+    }
     const lensButton = event.target.closest("[data-lens]");
     if (lensButton) return update({ lens: lensButton.dataset.lens, selection: null });
 
@@ -1521,6 +1624,9 @@ function wire() {
     const option = event.target.closest("[data-option]");
     if (option) {
       const options = { ...state.options };
+      if (["populationMethod", "populationFamily", "populationModifiers", "populationBinaryApproximation", "populationTarget", "populationData"].includes(option.dataset.option)) {
+        delete options.populationPrediction;
+      }
       // A control can hand the lens back to its own clock by choosing "auto".
       if (option.dataset.value === "auto") delete options[option.dataset.option];
       else options[option.dataset.option] = option.dataset.value;
@@ -1558,7 +1664,10 @@ function wire() {
     const wagerButton = event.target.closest("[data-wager]");
     if (wagerButton && rig && state.contrast) {
       const key = `${state.contrast.treat1}\u0000${state.contrast.treat2}`;
-      if (wagerButton.dataset.wager === "open")
+      if (wagerButton.dataset.wager === "open") {
+        stopRig();
+        rig.running = false;
+        rig.v = 0;
         // The guess starts where the reader would have to move it from, well
         // clear of the answer, so that leaving it untouched is not a guess.
         return update({
@@ -1569,6 +1678,7 @@ function wire() {
             settled: false,
           },
         });
+      }
       if (wagerButton.dataset.wager === "clear") return update({ wager: null });
       // Letting go tests the guess: the assembly is pulled to it and released,
       // and where it stops is the answer.
@@ -1579,6 +1689,7 @@ function wire() {
 
     const play = event.target.closest("[data-play]");
     if (play && rig) {
+      if (state.wager && !state.wager.settled) return;
       if (play.dataset.play === "pull") {
         // Far enough to swing visibly, in the data's own units.
         releaseFrom(rig, rig.equilibrium + rig.span * 0.9);
@@ -1607,6 +1718,11 @@ function wire() {
   });
 
   app.addEventListener("change", (event) => {
+    if (event.target.id === "wager-value" && state.wager && !state.wager.settled) {
+      const guess = Number(event.target.value);
+      if (event.target.value.trim() && Number.isFinite(guess)) update({ wager: { ...state.wager, guess } });
+      return;
+    }
     if (event.target.id === "treat1" || event.target.id === "treat2") {
       const treat1 = document.querySelector("#treat1").value;
       const treat2 = document.querySelector("#treat2").value;
@@ -1705,6 +1821,17 @@ function wire() {
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") return update({ panel: null, selection: null, error: null });
+    if (state.panel) {
+      if (event.key === "Tab") {
+        const items = [...document.querySelectorAll('#overlay button:not(:disabled), #overlay input:not(:disabled), #overlay select, #overlay a[href], #overlay textarea')].filter((el) => el.getClientRects().length);
+        const index = items.indexOf(document.activeElement);
+        if ((event.shiftKey && index <= 0) || (!event.shiftKey && index === items.length - 1)) {
+          event.preventDefault();
+          items[event.shiftKey ? items.length - 1 : 0]?.focus();
+        }
+      }
+      return;
+    }
     if (nudgeSelected(event)) event.preventDefault();
   });
 
@@ -1728,7 +1855,7 @@ function nudgeSelected(event) {
   if (!draggableLens()) return false;
   // Not while the reader is in a menu, a slider or a text field.
   const active = document.activeElement;
-  if (active && active !== document.body && active.closest("#controls, #overlay")) return false;
+  if (active && active !== document.body && active.closest("input, select, textarea, button, #controls, #overlay")) return false;
 
   const treatment = state.selection.id;
   const model = activeModel();

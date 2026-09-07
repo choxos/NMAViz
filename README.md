@@ -4,12 +4,13 @@
 has proposed for it.**
 
 Upload the data behind an NMA and the site fits the frequentist graph-theoretical model in your
-browser, then draws that one fitted model eight different ways: as a map whose distances are
+browser, then draws that fitted model through eight linked lenses: as a map whose distances are
 standard errors, as trials rather than comparisons, as a flow of evidence, as a contribution
 matrix, as a signed reconstruction of the estimate trial by trial, as a decomposition of its
 inconsistency, as a diffusion, and as a system of springs.
 
-There is no backend and no upload. The file is parsed, analyzed and drawn on your own machine.
+A ninth, separate population laboratory fits editable individual and aggregate data for population
+adjustment. All analysis runs locally in the browser; selected files are not sent to a backend.
 
 **[Open it at nmaviz.xera.ac](https://nmaviz.xera.ac)**
 
@@ -25,20 +26,34 @@ There is no backend and no upload. The file is parsed, analyzed and drawn on you
 ## What it does
 
 Most network meta-analysis software answers what the estimates are. This answers where they came
-from. Every view below is the same fitted model seen from a different angle, and the comparison of
-interest is a single control shared across all of them, so switching lens changes the question, not
-the subject.
+from. The first eight lenses share the fitted contrast network and selected comparison. The Population
+lens has its own synthetic or imported individual and aggregate data; selecting it does not
+population-adjust the contrast network.
 
 | Lens | What it shows | After |
 | --- | --- | --- |
 | **Network** | Every comparison, with the studies behind it, in an arrangement where the distance between two treatments is the standard error of comparing them. A separation control fans each comparison out into its individual studies. | Rücker 2012 |
-| **Trials** | Trials as nodes of their own, so a multi-arm trial is one object touching three treatments rather than three indistinguishable edges. The designs table is the incomplete block reading. | Drawing after Davies 2026; block reading after Senn 2013; influence shading is Wang 2026 |
-| **Flow** | Where one estimate actually comes from: each comparison oriented the way its current runs, with the routes and their shares. | König, Krahn and Binder 2013 |
-| **Contributions** | Which comparisons, and which trials, the estimate rests on, under both the shortest path and the random walk method at once. | Davies et al 2022, Rücker et al 2024 |
-| **Reconstruction** | What each trial did: a signed amount, in the units of the outcome, and a waterfall that walks to the network estimate with nothing left over. | Wang et al 2026 |
-| **Inconsistency** | The disagreement triangles can see, and the disagreement they cannot, as an orthogonal split of the between-comparison Q. | Jiang et al 2011 |
-| **Diffusion** | How far the evidence had to travel to explain the uncertainty, animated as a convergent series rather than as decoration. | Rücker, Davies and Schwarzer 2026 |
-| **Springs** | The mechanism: studies in parallel, routes in series, on the effect axis. Pull the parallel bundle and let it settle. | Papakonstantinou et al 2021 for the pairwise mechanism; routes in series are an extension of it |
+| **Trials** | Trial nodes, signed arm coefficients, trial-level reconstruction, and supported treatment-trial random-walk transitions with a block-model identity check. | Drawing after Davies 2026; block reading after Senn 2013; influence shading is Wang 2026 |
+| **Flow** | Directed evidence currents, routes, study/design flow, mean path length, and study/design minimal parallelism. | König, Krahn and Binder 2013 |
+| **Contributions** | Comparison and trial shares under shortest-path, random-walk, minimum-L1, and minimum-L2 path weights, including signed L2 shares. | Davies et al 2022, Rücker et al 2024 |
+| **Reconstruction** | Signed study contributions, covariance-aware direct/indirect uncertainty, canonical direct-first edges and widest-first routes, with any route residual reported. | Wang et al 2026 |
+| **Inconsistency** | Gradient, triangular and harmonic components, topology-changing teaching examples, and Hodge/Borda/Kemeny ordering comparisons. | Jiang et al 2011 |
+| **Diffusion** | Variance diffusion, a Jacobi effect-estimate solver with convergence diagnostics, and absorbing random-walk crossings compared with the hat matrix. | Rücker, Davies and Schwarzer 2026 |
+| **Springs** | The mechanism: studies in parallel, routes in series, on the effect axis. Pull the parallel bundle, inspect heterogeneity compliance, or predict a hidden resting point and check it. | Papakonstantinou et al 2021 for the pairwise mechanism; routes in series are an extension of it |
+| **Population** | Editable ML-NMR, STC and MAIC experiments; target-population predictions, integration checks and Bayesian sampling diagnostics. | Phillippo thesis; see scope below |
+
+## Learn by doing
+
+Each lens offers two numeric prediction challenges with corrective explanations and a session score
+(18 challenges total). These use stated teaching examples independently of imported research data.
+The spring wager hides the resting answer before submission; the population mission asks for the
+direction of a transported effect before revealing fitted outcomes. Hodge examples let learners
+compare a chordless cycle with a triangulated network.
+
+Keyboard controls support trial exclusion and spring interaction. Dialogs trap focus, close with
+Escape, and restore focus to their opener. Practice feedback uses live status text; the mobile
+layout can expand the diagram within a scrollable region. These are implemented learning and
+accessibility features, not evidence that the app is universally accessible or educationally optimal.
 
 ## Data it accepts
 
@@ -67,46 +82,46 @@ guessed from the name of the effect column and defaults to the identity scale, w
 are shown exactly as the file gave them. The data panel names the guess and lets you correct it;
 correcting it matters, because a ratio measure is fitted on the log scale and shown exponentiated.
 
-Pooled results alone are not enough, and the site says so rather than guessing: every lens here
-reads the hat matrix, and the hat matrix is built from the individual studies.
+Pooled results alone cannot reconstruct the contrast-network evidence: its hat matrix requires
+study-level data. Population adjustment additionally requires the covariate and outcome inputs
+described below.
 
 Thirteen example networks ship with the site, the full set distributed with the R package
 `netmeta`: three treatments to twenty-two, three studies to ninety-three, two-arm only to heavily
 multi-arm, and mean differences through odds and incidence rate ratios.
 
-## Is the arithmetic right
+## Verification
 
-The engine is a from-scratch JavaScript implementation of the graph-theoretical model, so the
-question matters. `scripts/fixtures.R` writes what netmeta 3.6.1 computes for six published
-networks, two of them with multi-arm studies, and the test suite compares this engine to those
-numbers rather than to itself:
+The JavaScript engine is checked against committed fixtures from `netmeta` 3.6.1 for six networks,
+including multi-arm studies. `scripts/fixtures.R` regenerates those model fixtures. Tests cover
+Laplacians, pseudoinverses, hat matrices, common/random estimates and SEs, direct/indirect estimates,
+heterogeneity, design Q decomposition, sorting, and multi-arm adjustments. Tolerances are specified
+in the tests; passing fixtures do not establish correctness for every possible input.
 
-- the Laplacian and its Moore-Penrose pseudoinverse
-- the hat matrix, in netmeta's own row order
-- the common and random effect estimates and standard errors, for every pair
-- the direct and indirect estimates and the direct evidence proportion
-- Q, its degrees of freedom, τ² and I², and its split into what happens within a design and what
-  happens between designs
-- the internal sort order and the multi-arm variance adjustment, row by row
-- the evidence flow measures, and the contribution matrices under both methods
+The supplied Linde2016 path-method matrices provide a separate reference for all L2 and random-walk
+entries. Shortest-path ties and nonunique L1 optima can give different valid allocations. L1 tests
+therefore certify flow reconstruction, nonnegativity and the minimum objective rather than require
+one solver's particular answer.
 
-Everything above agrees to at least seven decimal places, and most of it to nine, except the
-shortest path contribution method, which is held to a looser tolerance on purpose: when several routes of equal length are
-available it drains whichever the implementation finds first, and that ambiguity is exactly what
-the random walk method was introduced to remove.
-
-Beyond the comparison with netmeta, the structural claims are tested as claims. The resting point
-of the springs assembly is the pooled estimate to the last bit, and the energy it still holds there
-is exactly half Cochran's Q, on every comparison of every bundled network. Kirchhoff's law
-holds at every treatment in every flow network. The diffusion series converges to the effective
-resistances the Laplacian gives. The Hodge parts rebuild the observed flow, are orthogonal in the
-precision-weighted inner product, and their energies add to the between-comparison part of Q
-computed the other way round. The signed trial contributions add to the network estimate, and their
-treatment balances add to the target contrast.
+Structural and regression checks cover contrast reversal, covariance-aware random-effects
+reconstruction, canonical routes, flow conservation, bipartite block identities, Hodge orthogonality,
+spring equilibrium/energy, diffusion convergence, and input validation. Population tests include
+synthetic fits; numerical integration is checked against analytic moments, and posterior sampling
+against known normal and beta targets. These are not independent reproductions of every thesis case
+study or clinical validation.
 
 ```sh
 npm test
+npm run build
+npx playwright install chromium
+npm run test:browser
 ```
+
+The browser script starts its own local Vite server. It exercises nine lenses, practice feedback,
+keyboard dialog focus and trial exclusion, four contribution methods, Hodge examples, diffusion,
+the spring wager, population fitting, and mobile expansion. Screenshots are written under
+`documentation/implementation/browser/`. Browser coverage is a set of concrete scenarios, not a
+complete accessibility or usability evaluation.
 
 ## Run
 
@@ -128,17 +143,24 @@ Rscript scripts/examples.R
 
 ## Choices worth knowing about
 
-**Multi-arm studies.** The model uses netmeta's reduce-weights adjustment, and τ² enters the study
-variances before that adjustment rather than after. Cochran's Q is split by design rather than by
-comparison, because summing each comparison's own Q mixes two different weightings once a
-multi-arm study is present and can make the inconsistency term come out negative. Two consequences surface in the interface
-rather than being hidden. The published direct evidence proportion, a ratio of variances computed
-on the studies' original standard errors, separates from the hat matrix entry on the model's own
-weights; both are shown. And the exact within-study covariance, which Wang et al use, would give a
-slightly different fit from the one netmeta reports, so the reconstruction lens uses the model's own
-weights for its coefficients, in order to add up to the estimate the rest of the site shows, and the
-true covariance for its uncertainties, because the direct and indirect parts of a multi-arm trial
-are genuinely correlated.
+**Multi-arm studies.** The model uses netmeta's reduce-weights adjustment, with τ² added before the
+adjustment. For coherent complete multi-arm contrasts and their covariance, this is equivalent to
+reduced-dimension GLS. Reconstruction uses the fitted weights and the full within-study covariance,
+including heterogeneity. Direct and indirect contributions remain correlated. Design-based Q
+components use compatible adjusted weights. Input validation rejects invalid or materially
+incoherent multi-arm data; rounded contrasts may leave a reported canonical-route effect residual.
+
+**Bipartite information flow.** Signed treatment-trial coefficients reconstruct the contrast fit.
+Positive arm-precision transitions and the fixed-trial block identity require an independent-arm
+variance representation. Unsupported cases are identified instead of assigning invented transition
+probabilities. A two-arm contrast does not identify separate arm variances; its default equal split
+is an explicit convention, not recovered arm information.
+
+**Path optimization.** L1/L2 enumerate at most 5,000 directed paths across at most 150 active
+comparisons. L1 uses a maximum of 10,000 iterations and requires a certified feasible optimum.
+Bounds or nonconvergence produce an error; choose shortest path or random walk for those networks.
+L2 can yield negative shares, which are retained. Canonical projection routes use a separate
+study-based direct-first and widest-first decomposition, not these contribution percentages.
 
 **The arrangement.** The Laplacian pseudoinverse is a Gram matrix, so its principal coordinates
 place treatments where the straight-line distance between two of them is the standard error of the
@@ -149,36 +171,97 @@ is measured on the drawing that is actually on screen and printed under the titl
 **Inconsistency.** The Hodge split is computed on one pooled estimate per comparison. Disagreement
 between studies of the same comparison is heterogeneity, not inconsistency, and is not part of it.
 It is a diagnostic to read alongside a design-by-treatment interaction model, not a replacement for
-one. Its residual is the between-comparison Q, which is not netmeta's between-design Q: on senn2013
-they are 22.459 and 22.530, and the interface names which one it is showing.
+one. Its residual is the between-comparison Q, which need not equal netmeta's between-design Q;
+the interface names which quantity it is showing.
 
-**Long-loop inconsistency is usually impossible, not absent.** The harmonic part of the Hodge split
-lives in a space whose dimension is a property of the network's shape, and on all thirteen bundled
-networks that dimension is zero: every loop of four treatments or more has a shortcut across it, so
-checking the triangles checks everything. The lens says "none possible" rather than "0%", because
-those are different statements and only one of them is about the data.
+**Harmonic dimension is structural.** The harmonic space depends on network topology. When triangle
+boundaries span the cycle space, its dimension is zero and the lens says "none possible". That is
+not evidence that observed comparisons agree. The chordless four-cycle example demonstrates a
+network where harmonic inconsistency is possible.
 
 **What Papakonstantinou et al actually cover.** Their paper is about pairwise meta-analysis, and
 says extending the spring system to a network is future work. Studies in parallel, the pooled
 estimate as the resting point, and the energy identity are theirs; routes in series, drawn from the
 flow decomposition, are this site's extension of the idea and are labeled as such.
 
-**Mean path length and minimal parallelism** are computed over comparisons. netmeta groups a
-multi-arm study's comparisons into a single design first, so the two definitions differ where a
-multi-arm study is involved; the tests check them on the networks where they coincide.
+**Flow measures.** The interface distinguishes comparison-edge path summaries from study/design
+measures. Design mean path length sums design flows; study and design minimal parallelism use the
+reciprocal of the corresponding maximum flow. They need not equal edge-based measures when
+multi-arm studies are present.
 
-## What this is not
+**Ranking.** Hodge potential and Borda scores are descriptive orderings. Exact Kemeny optimization
+is bounded to 12 treatments; the interface reports when it is unavailable. These are not SUCRA,
+rankograms, probabilities of being best, or a clinical recommendation.
 
-It does not fit Bayesian models, rank treatments, produce SUCRA or rankograms, assess risk of bias,
-or judge transitivity. It has no opinion on whether a network should have been analyzed at all.
-Nothing here establishes transitivity, absence of bias, or a clinically meaningful ranking: zero
-inconsistency is not evidence of validity, and a large contribution is not evidence of quality.
+## Population laboratory and limits
+
+The population editor accepts JSON containing IPD (`study`, `treatment`, `x`, `y`), aggregate records,
+a reference treatment and an optional target population. Covariates may be scalar or vectors.
+Aggregate binary records use `n/events`, normal records `mean/se`, ordinal records category counts,
+and survival records event/censoring times with covariates marginalized. Use the editable examples
+and JSON export for the full schema. Population data are separate from the CSV contrast import.
+
+ML-NMR integrates individual response probabilities in the aggregate likelihood. Binary aggregate
+arms offer a one-parameter binomial approximation using E[p], or a two-parameter approximation
+matching the Poisson-binomial mean and variance with N* = n E[p]²/E[p²] and p* = E[p²]/E[p].
+The latter uses a continuous-N binomial likelihood with gamma-function coefficients; it is an
+approximation, not the exact Poisson-binomial likelihood. Parameter proposals with N* below the
+observed event count have zero support.
+
+STC fits IPD
+outcome regression and standardizes predictions. MAIC balances covariate means and reports effective
+sample size, weighted outcomes and bootstrap uncertainty with weights re-estimated in each resample;
+anchored comparison is conditional on matching the supplied aggregate target. MAIC requires overlap,
+and its bootstrap conditions on supplied target moments. MAIC supports binary and normal outcomes;
+it does not estimate ordinal or survival contrasts.
+
+Population distributions may use empirical points, a uniform midpoint shortcut, or Sobol points
+with a Gaussian copula and normal, lognormal, uniform or Bernoulli marginals. Copula correlation is
+on the latent Gaussian scale. Integration diagnostics compare finite approximations, not guaranteed
+absolute error bounds. Unknown covariate distributions and measurement error are not inferred.
+
+The fixed-effects fitter supports binary, normal, ordinal and Weibull survival likelihoods with
+one to five covariates and shared, independent or no effect modification. Normal sigma, ordinal
+cutpoints, Weibull shape and aggregate normal SEs are supplied as known. Limits are 2,000 IPD
+records, 100 aggregate records and 24 fitted coefficients. Approximate Wald SEs come from numerical
+observed information; nonidentifiability and optimizer diagnostics are displayed.
+
+After a prediction, the inspector offers background Bayesian sampling with cancellation. Both fixed
+and hierarchical sampling default to four chains with 500 warmup and 1,000 retained draws per chain.
+The controls also offer 4,000 or 12,000 retained draws; JSON `sampling.warmup` and `sampling.seed`
+set warmup and reproducibility. Fixed-model sampling uses independent Normal(0, 2.5²) coefficient
+priors. Hierarchical controls select random/fixed effects, modifier structure and consistency/UME.
+Both sample the specified likelihood or aggregate approximation using Metropolis chains.
+
+The hierarchical model supports a common heterogeneity SD with multi-arm covariance τ²/2 and
+shared, independent, exchangeable or no modifiers. Exchangeability uses one global class of active
+treatments. Normal coefficient and half-normal SD priors are proper and depend on covariate units.
+The backend is bounded to 40 parameters and two to eight chains. UME (unrelated mean effects) is
+available only for closed networks of two-arm trials; tree and multi-arm inputs are rejected.
+
+Posterior target summaries include response, conditional-effect and binary marginal-log-OR
+intervals. Absolute predictions borrow an observed study baseline; they do not estimate a new
+target baseline or include a new-study random effect. Deviance omits data-only constants and is
+comparable only on the same data. Integration and posterior intervals condition on supplied
+population distributions and nuisance parameters.
+
+Sampling reports classical split-R̂, ESS, MCSE and acceptance diagnostics. Short teaching runs can
+fail those checks; these are not rank-normalized diagnostics or a guarantee of convergence. The
+sampler is not a replacement for a validated production Bayesian workflow, and the examples do not
+reproduce the thesis's clinical trials or simulation studies.
+
+## Interpretation limits
+
+The reference collection guides the implementations; this is not complete reproduction of every
+paper, thesis chapter, simulation and clinical case study. The app does not assess risk of bias,
+establish transitivity, identify all effect modifiers, or establish causal transportability. Zero
+inconsistency does not validate a network; large contribution does not mean high-quality evidence.
 
 ## Privacy
 
-The site is static. There is no account, no login, and no server that records anything about a
-visitor. An uploaded file is read by the browser and never leaves the machine; the theme choice is
-kept in local storage.
+The app is static, with no account or login. Analysis files and population JSON are processed in
+the browser; the app does not send them to an analysis server. The theme choice is kept in local
+storage. Hosting infrastructure may separately log ordinary page requests.
 
 ## License
 
@@ -188,7 +271,7 @@ data panel.
 
 ## References
 
-The lenses implement, in order:
+Method sources include:
 
 - Rücker G. Network meta-analysis, electrical networks and graph theory. *Res Synth Methods*
   2012;3(4):312-324.
@@ -214,6 +297,6 @@ The lenses implement, in order:
 The reference implementation this engine is tested against is Schwarzer G, Carpenter JR, Rücker G.
 *netmeta: Network Meta-Analysis using Frequentist Methods*, R package version 3.6.1.
 
-Multilevel network meta-regression, which the reading behind this project also covers, is a way to
-adjust a network for differences between populations rather than a way to look at one. It is not
-implemented here, and nothing on the site is population adjusted.
+The separate population laboratory draws on Phillippo DM, *Population adjustment methods for
+indirect comparisons: a review and development of multilevel network meta-regression*, PhD thesis.
+Its implemented scope and inference limits are described above.

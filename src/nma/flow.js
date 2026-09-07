@@ -163,3 +163,35 @@ function shortestRoute(outgoing, remaining, start, finish) {
   }
   return null;
 }
+
+/* Koenig et al. (2013), sections 3.3.1 and 3.4: clique net flow is
+ * half the L1 norm of its treatment injections, independent of contrast coding. */
+export function flowMeasures(model, treat1, treat2) {
+  const a = model.index.get(treat1), b = model.index.get(treat2);
+  if (a == null || b == null || a === b) throw new Error("Choose two different treatments.");
+  const studies = new Map();
+  model.rows.forEach((row, r) => {
+    if (!studies.has(row.studlab)) studies.set(row.studlab, { name: row.studlab, treatments: new Set(), injection: new Array(model.n).fill(0) });
+    const study = studies.get(row.studlab);
+    study.treatments.add(row.treat1).add(row.treat2);
+    const i = model.index.get(row.treat1), j = model.index.get(row.treat2);
+    const h = model.w[r] * (model.Lplus[a][i] - model.Lplus[a][j] - model.Lplus[b][i] + model.Lplus[b][j]);
+    study.injection[i] += h;
+    study.injection[j] -= h;
+  });
+  const designs = new Map();
+  const netFlow = (injection) => injection.reduce((s, x) => s + Math.abs(x), 0) / 2;
+  for (const study of studies.values()) {
+    study.flow = netFlow(study.injection);
+    const key = JSON.stringify([...study.treatments].sort());
+    if (!designs.has(key)) designs.set(key, { name: [...study.treatments].sort().join(" / "), injection: new Array(model.n).fill(0) });
+    const design = designs.get(key);
+    study.injection.forEach((x, i) => { design.injection[i] += x; });
+  }
+  for (const design of designs.values()) design.flow = netFlow(design.injection);
+  const studyFlows = [...studies.values()], designFlows = [...designs.values()];
+  return { studyFlows, designFlows,
+    studyParallelism: 1 / Math.max(...studyFlows.map((s) => s.flow)),
+    designParallelism: 1 / Math.max(...designFlows.map((d) => d.flow)),
+    meanPathLength: designFlows.reduce((s, d) => s + d.flow, 0) };
+}
