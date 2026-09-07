@@ -323,8 +323,14 @@ button {
   font-weight: 550;
 }
 
-button:hover:not(:disabled) {
-  background: var(--wash);
+/* A pointer that cannot hover still leaves the last thing it touched in the
+   hover state, and this rule outranks every active state a button has: the lens
+   the machine was playing went grey the moment it was chosen. Nothing hovers
+   here, so nothing is drawn as hovered. */
+@media (hover: hover) {
+  button:hover:not(:disabled) {
+    background: var(--wash);
+  }
 }
 
 button:disabled {

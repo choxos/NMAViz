@@ -45,9 +45,11 @@
   height: 16px;
 }
 
-.lens-button:hover {
-  background: var(--wash);
-  color: var(--ink-soft);
+@media (hover: hover) {
+  .lens-button:hover {
+    background: var(--wash);
+    color: var(--ink-soft);
+  }
 }
 
 .lens-button.active {
@@ -196,8 +198,10 @@
   cursor: pointer;
 }
 
-.text-button:hover {
-  color: var(--ink);
+@media (hover: hover) {
+  .text-button:hover {
+    color: var(--ink);
+  }
 }
 
 #arrangement-state {
@@ -348,8 +352,10 @@
   color: var(--muted);
 }
 
-.pills button:hover {
-  background: var(--surface);
+@media (hover: hover) {
+  .pills button:hover {
+    background: var(--surface);
+  }
 }
 
 .pills button.active {
@@ -749,9 +755,11 @@ input[type="range"] {
   white-space: nowrap;
 }
 
-.deck-button:hover {
-  background: var(--wash);
-  color: var(--ink);
+@media (hover: hover) {
+  .deck-button:hover {
+    background: var(--wash);
+    color: var(--ink);
+  }
 }
 
 .deck-button.primary {

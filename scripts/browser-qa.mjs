@@ -231,6 +231,22 @@ try {
     [],
     "Every control on a phone must be at least 40px across"
   );
+  // A pointer that cannot hover leaves the last thing it touched in the hover
+  // state, and the hover paint outranks every active state a button has: the
+  // game being played went grey the moment its key was pressed.
+  await phone.locator('button[data-lens="flow"]').tap();
+  await phone.waitForFunction(() => document.querySelector("#stage").dataset.lens === "flow");
+  await phone.locator('button[data-lens="network"]').tap();
+  await phone.waitForFunction(() => document.querySelector("#stage").dataset.lens === "network");
+  assert.equal(
+    await phone.evaluate(() => {
+      const lit = getComputedStyle(document.querySelector(".game-key.active")).backgroundColor;
+      return lit === getComputedStyle(document.querySelector(".dpad-hub")).backgroundColor;
+    }),
+    true,
+    "The game being played stays lit in key yellow after its key is tapped"
+  );
+
   // The sheets the tabs open are not part of the manual, and the one that takes
   // pasted data is all field: under 16px a phone browser zooms into it.
   await phone.locator("#data-button").tap();

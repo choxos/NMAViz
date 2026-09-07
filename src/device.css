@@ -557,8 +557,10 @@ body {
   white-space: nowrap;
 }
 
-.game-key:hover {
-  color: #eceff2;
+@media (hover: hover) {
+  .game-key:hover {
+    color: #eceff2;
+  }
 }
 
 .game-key.active {
@@ -833,9 +835,11 @@ body {
   padding: 5px;
 }
 
-.tab:hover {
-  background: var(--wash);
-  color: var(--ink);
+@media (hover: hover) {
+  .tab:hover {
+    background: var(--wash);
+    color: var(--ink);
+  }
 }
 
 .manual-note {
