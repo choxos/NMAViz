@@ -117,6 +117,14 @@ export const reconstruction = {
       .join("");
 
     const finalY = top + walk.length * gap + 24;
+
+    // A caption centred on the total runs off the drawing when the total sits
+    // near one end of the axis, which on a panel means the last few characters
+    // are simply cut off. Near an edge it hangs from that edge instead.
+    const totalLabelAnchor =
+      x(estimate) > right - 92 ? "end" : x(estimate) < left + 92 ? "start" : "middle";
+    const totalLabelAt = Math.min(right, Math.max(left, x(estimate)));
+
     const scaleLabel = (value) =>
       number(onScale(value, measure), isRatio(measure) ? 2 : 3);
 
@@ -131,9 +139,9 @@ export const reconstruction = {
         <line x1="${x(estimate).toFixed(1)}" y1="${top - 20}" x2="${x(estimate).toFixed(
           1
         )}" y2="${finalY + 10}"/>
-        <text x="${x(estimate).toFixed(1)}" y="${finalY + 30}" text-anchor="middle">
-          the network estimate, ${scaleLabel(estimate)}
-        </text>
+        <text x="${totalLabelAt.toFixed(1)}" y="${finalY + 30}" text-anchor="${
+          totalLabelAnchor
+        }">the network estimate, ${scaleLabel(estimate)}</text>
       </g>`;
 
     // The tension plot: direct, indirect, and the network estimate between them.

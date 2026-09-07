@@ -303,6 +303,12 @@ function renderControls() {
   const fanHint = node.querySelector("#separation-hint");
   if (fanHint) fanHint.textContent = fan.hint;
 
+  const dragHint = node.querySelector("#drag-hint");
+  if (dragHint)
+    dragHint.textContent = draggableLens()
+      ? "Drag a treatment to move it, or use the pad on the machine."
+      : "Nothing here is dragged. Left and right on the pad change the comparison, up and down change the game.";
+
   const moved = Object.keys(state.pins).length;
   const placedBlock = node.querySelector("#arrangement-state");
   if (placedBlock) {
@@ -655,10 +661,13 @@ function renderStage() {
   // itself, less the room a treatment's label needs under its circle and the
   // room the source branch needs to bow into.
   const margin = Math.max(16, Math.min(34, width * 0.05));
+  // A game that draws something standing above a treatment, such as the pipette
+  // the walk is released from, needs the room for it inside the glass.
+  const headroom = LENSES.find((entry) => entry.id === state.lens)?.headroom ?? 0;
   const box = {
     left: margin,
     right: width - margin,
-    top: margin,
+    top: margin + headroom,
     bottom: height - margin - 12,
   };
   // How big a treatment is drawn follows how much room the drawing has.
@@ -1458,20 +1467,31 @@ function pressPad(way) {
   const model = activeModel();
   if (!model) return;
 
-  if (state.selection?.kind !== "treatment") {
+  if (state.selection?.kind !== "treatment" && draggableLens()) {
     const start = state.contrast?.treat1 ?? model.treatments[0];
     return update({ selection: { kind: "treatment", id: start } });
   }
 
-  // Where the arrangement cannot be changed, left and right walk the selection
-  // along the treatments instead, which is the only way to travel the network
-  // with four keys.
+  // Two of the games draw no network to move a treatment around in. There the
+  // pad moves through the lists instead: up and down change the game, left and
+  // right walk the comparison being asked about along the treatments, which is
+  // the one thing that changes what those two games show. Four directions and
+  // none of them dead.
   if (!draggableLens()) {
-    if (way === "up" || way === "down") return;
-    const order = model.treatments;
-    const at = order.indexOf(state.selection.id);
-    const next = order[(at + (way === "right" ? 1 : order.length - 1)) % order.length];
-    return update({ selection: { kind: "treatment", id: next } });
+    if (way === "up" || way === "down") {
+      const at = LENSES.findIndex((entry) => entry.id === state.lens);
+      const next = LENSES[(at + (way === "down" ? 1 : LENSES.length - 1)) % LENSES.length];
+      return update({ lens: next.id, selection: null });
+    }
+    const order = model.treatments.filter((t) => t !== state.contrast?.treat1);
+    if (!order.length) return;
+    const at = order.indexOf(state.contrast?.treat2);
+    const step = way === "right" ? 1 : order.length - 1;
+    const next = order[(Math.max(0, at) + step) % order.length];
+    return update({
+      contrast: { treat1: state.contrast.treat1, treat2: next },
+      selection: { kind: "treatment", id: next },
+    });
   }
 
   nudgeSelected({ key: PAD_KEYS[way], shiftKey: false });

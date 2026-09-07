@@ -140,6 +140,8 @@ export const diffusionLens = {
   // reader can pick one up and move it.
   spatial: true,
   separates: true,
+  // The dropper stands above the treatment it releases the walk on.
+  headroom: 48,
   id: "diffusion",
   name: "Diffusion",
   tagline: "How far the evidence had to travel to explain the uncertainty",

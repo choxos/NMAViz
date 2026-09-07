@@ -66,7 +66,7 @@ function labelBox(label, point, radius, width, height, box) {
   const length = Math.hypot(dx, dy) || 1;
   const offset = radius + 13;
   let x = point.x + (dx / length) * offset;
-  const y = point.y + (dy / length) * offset;
+  let y = point.y + (dy / length) * offset;
   let anchor = dx > 12 ? "start" : dx < -12 ? "end" : "middle";
 
   const room = label.length * 6.1 + 6;
@@ -78,7 +78,21 @@ function labelBox(label, point, radius, width, height, box) {
     anchor = "start";
     x = point.x + offset;
   }
-  const baseline = dy > 12 ? "hanging" : dy < -12 ? "auto" : "middle";
+  let baseline = dy > 12 ? "hanging" : dy < -12 ? "auto" : "middle";
+  // A treatment at the very top of the drawing has its label pushed off the
+  // top of it, which on a window merely looked loose and on a panel means the
+  // label is cut in half. Turned back under the circle it is inside the
+  // drawing, and the space below a topmost treatment is empty for the same
+  // reason the space above it was chosen: nothing else is out there.
+  if (box) {
+    if (baseline === "auto" && y - 15 < box.top) {
+      y = point.y + offset;
+      baseline = "hanging";
+    } else if (baseline === "hanging" && y + 15 > box.bottom) {
+      y = point.y - offset;
+      baseline = "auto";
+    }
+  }
   // Inter at 11px runs to about 6.1 pixels a character, which is close enough
   // to reserve space with.
   const w = label.length * 6.1 + 6;

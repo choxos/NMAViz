@@ -72,6 +72,10 @@ export const subscribe = (listener) => {
  */
 function invalidate(changes) {
   if (changes.model && changes.model !== state.model) state.wager = null;
+  // Pause is about what was running, and every game runs a different thing.
+  // Carried across it would leave the key and the flag disagreeing about which
+  // of them is holding the picture still.
+  if (changes.lens && changes.lens !== state.lens) state.paused = false;
   const next = changes.contrast;
   if (!next || !state.contrast) return;
   // The wager is placed on an axis that runs from one treatment to the other,
