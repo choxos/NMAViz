@@ -46,15 +46,24 @@ function edgeGeometry(context) {
 }
 
 /* Plain wires or circuit symbols. Rücker's reading is not an alternative model,
- * it is what the model already is, so this is a style rather than a lens. */
-const STYLES = { plain: "Plain", circuit: "Circuit" };
+ * it is what the model already is, so this is a style rather than a lens.
+ *
+ * It is also the default. The variance of a network estimate is the effective
+ * resistance between two treatments, and a reader shown that first has the
+ * right picture of what the arrangement means; a reader shown plain lines
+ * first has to be told. The plain drawing stays for a dense network, where
+ * sixty zigzags say less than sixty lines, and for anyone who would rather
+ * read the thing as a graph.
+ */
+const STYLES = { circuit: "Circuit", plain: "Plain" };
+const DEFAULT_STYLE = "circuit";
 
 function stylePills(state) {
   return Object.entries(STYLES)
     .map(
       ([id, label]) =>
         `<button type="button" data-option="style" data-value="${id}" class="${
-          (state.options.style ?? "plain") === id ? "active" : ""
+          (state.options.style ?? DEFAULT_STYLE) === id ? "active" : ""
         }">${label}</button>`
     )
     .join("");
@@ -377,7 +386,7 @@ export const network = {
     const { model, state, measure } = context;
     const geometry = edgeGeometry(context);
     const emphasis = contrastEmphasis(state);
-    const style = state.options.style === "circuit" ? "circuit" : "plain";
+    const style = (state.options.style ?? DEFAULT_STYLE) === "plain" ? "plain" : "circuit";
 
     if (style === "circuit") return circuit(context, geometry, emphasis);
 
